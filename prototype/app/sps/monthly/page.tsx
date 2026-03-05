@@ -358,6 +358,11 @@ function MonthlyContent() {
         </div>
       </div>
 
+      {/* 안내문구 (정책 2.3) */}
+      <p className="text-sm text-gray-500">
+        ※ 간이지급명세서 신고파일 생성 후 신고파일 데이터에서 값이 수정된 대상자 또는 추가된 대상자는 상단 &apos;상세검색&apos;을 통해 검색 후 간이지급명세서 개별 생성이 가능합니다.
+      </p>
+
       {/* 데이터 테이블 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
         <table className="w-full min-w-[900px]">
