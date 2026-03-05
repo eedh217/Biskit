@@ -1,634 +1,1063 @@
 import { PolicyModule, PolicyField, TableColumn } from "@/types";
+import * as summaryContent from "./policyContent/sps-summary";
+import * as monthlyContent from "./policyContent/sps-monthly";
+import * as addContent from "./policyContent/sps-add";
+import * as editContent from "./policyContent/sps-edit";
+import * as groupEditContent from "./policyContent/sps-group-edit";
+import * as excelContent from "./policyContent/sps-excel";
+import * as allListContent from "./policyContent/sps-all-list";
+import * as allAddContent from "./policyContent/sps-all-add";
+import * as allEditContent from "./policyContent/sps-all-edit";
 
-const employeeFields: PolicyField[] = [
+// ─── 사업소득 합산 (SPS_BI_01) ─────────────────────────────
+
+const spsSummaryFields: PolicyField[] = [
   {
-    name: "사번",
-    required: true,
-    type: "text",
-    maxLength: 30,
-    validation: ["중복 불가 (submit 시점)"],
-    errorMessages: { duplicate: "중복된 사번은 사용하실 수 없습니다." },
-    description: '허용 특수문자 32개: !"#$%&\'()*+,-./:;<>=?@[₩]^_`{|}~',
-  },
-  {
-    name: "성명",
-    required: true,
-    type: "text",
-    maxLength: 30,
-    validation: ["특수문자 불가"],
-    errorMessages: { specialChar: "특수문자는 입력하실 수 없습니다." },
-  },
-  {
-    name: "내외국인 여부",
-    required: true,
-    type: "enum",
-    options: ["내국인", "외국인"],
-    description: "선택에 따라 분기 입력 필드 변경",
-  },
-  {
-    name: "주민등록번호",
-    required: true,
-    type: "split-input",
-    description: "내국인 선택 시 필수. 인풋박스 2개(앞 6자리 - 뒤 7자리). 숫자만 입력 가능.",
-    validation: [
-      "앞 6자리 날짜 유효성",
-      "뒤 7자리 첫 숫자: 1900년대(1,2) / 2000년대(3,4)",
-    ],
-    errorMessages: { invalid: "유효하지 않은 주민등록번호입니다." },
-  },
-  {
-    name: "외국인등록번호",
-    required: false,
-    type: "split-input",
-    description:
-      "외국인 선택 시 여권번호와 택 1 필수. 인풋박스 2개(앞 6자리 - 뒤 7자리). 숫자만 입력 가능.",
-    validation: [
-      "앞 6자리 날짜 유효성",
-      "뒤 7자리 첫 숫자: 1900년대(5,6) / 2000년대(7,8)",
-    ],
-    errorMessages: { invalid: "유효하지 않은 외국인등록번호입니다." },
-  },
-  {
-    name: "여권번호",
-    required: false,
-    type: "text",
-    description:
-      "외국인 선택 시 외국인등록번호와 택 1 필수. 특수문자 불가. 선택 시 생년월일/성별 추가 필수.",
-  },
-  {
-    name: "국적",
+    name: "연도",
     required: true,
     type: "select",
-    description: "외국인 선택 시 필수. 전세계 국가 리스트, 가나다순 정렬.",
-  },
-  {
-    name: "거주구분",
-    required: true,
-    type: "radio",
-    options: ["거주자", "비거주자"],
-  },
-  {
-    name: "장애여부",
-    required: true,
-    type: "enum",
-    options: [
-      "비장애인",
-      "장애인복지법상 장애인",
-      "국가유공자 중증환자",
-      "중증환자",
-    ],
-  },
-  {
-    name: "이메일",
-    required: true,
-    type: "email",
-    validation: ["blur: 형식 검사", "submit: 퇴사일 NULL인 임직원과 중복 불가"],
-    errorMessages: {
-      format: "이메일 형식이 맞지 않습니다.",
-      duplicate: "근로자 중 중복된 이메일이 등록되어 있습니다.",
-    },
-  },
-  {
-    name: "연락처",
-    required: true,
-    type: "text",
-    maxLength: 30,
-    description: "허용 문자: + ( ) - 숫자",
-  },
-  {
-    name: "휴대폰번호",
-    required: true,
-    type: "split-input",
-    description: "인풋박스 3개(3자리 - 3자리 - 4자리). 숫자만 입력 가능.",
-  },
-  {
-    name: "입사일",
-    required: true,
-    type: "date",
-    description: "YYYYMMDD",
-    validation: ["blur 시 유효성 검사"],
-    errorMessages: { invalid: "유효하지 않은 날짜입니다." },
-  },
-  {
-    name: "퇴사일",
-    required: false,
-    type: "date",
-    description: "YYYYMMDD. NULL 허용(선택 입력)",
-    validation: ["blur 시 유효성 검사"],
-    errorMessages: { invalid: "유효하지 않은 날짜입니다." },
-  },
-  {
-    name: "주소",
-    required: true,
-    type: "address",
-    description:
-      "외부 무료 주소 검색 API 사용. 주소 검색 팝업 제공. 결과 클릭 시 우편번호/주소 자동 입력, 상세주소 포커스 이동.",
+    options: ["2026", "2027"],
+    description: "2026년 ~ (현재 연도 + 1)년. 기본값: 현재 연도.",
   },
 ];
 
-const employeeTableColumns: TableColumn[] = [
-  { name: "사번", type: "문자열" },
-  { name: "성명", type: "문자열" },
-  { name: "내외국인 여부", type: "ENUM", note: "내국인 / 외국인" },
-  { name: "이메일", type: "문자열" },
-  { name: "입사일", type: "YYYYMMDD" },
-  { name: "퇴사일", type: "YYYYMMDD / NULL", note: "NULL일 경우 빈 값 표시" },
-  { name: "연락처", type: "문자열" },
-  {
-    name: "장애여부",
-    type: "ENUM",
-    note: "비장애인 / 장애인복지법상 장애인 / 국가유공자 중증환자 / 중증환자",
-  },
+const spsSummaryTableColumns: TableColumn[] = [
+  { name: "월", type: "문자열", note: "1월~12월 고정" },
+  { name: "건수(소득자건수)", type: "숫자", note: "해당 월 소득 지급 건수 합계" },
+  { name: "총 지급액", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "총 소득세", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "총 지방소득세", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "총 실지급액", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "신고파일 최종생성일", type: "YYYY-MM-DD", note: "미생성 시 \"-\"" },
+  { name: "다운로드", type: "버튼", note: "미생성 시 visibility:hidden" },
 ];
 
-const workTypeFields: PolicyField[] = [
-  {
-    name: "근로형태명",
-    required: true,
-    type: "text",
-    maxLength: 10,
-    validation: ["특수문자 불가", "최대 글자 수 초과 검사"],
-    errorMessages: {
-      specialChar: "특수문자는 입력하실 수 없습니다.",
-      maxLength: "최대 10자까지 입력 가능합니다.",
-    },
-  },
-  {
-    name: "근로형태 코드",
-    required: true,
-    type: "text",
-    maxLength: 10,
-    validation: [
-      "특수문자 불가",
-      "최대 글자 수 초과 검사",
-      "중복 불가 (submit 시점)",
-    ],
-    errorMessages: {
-      specialChar: "특수문자는 입력하실 수 없습니다.",
-      maxLength: "최대 10자까지 입력 가능합니다.",
-      duplicate: "중복된 근로형태 코드는 사용하실 수 없습니다.",
-    },
-  },
-];
-
-const workTypeTableColumns: TableColumn[] = [
-  { name: "근로형태명", type: "문자열", note: "최대 10자" },
-  { name: "근로형태 코드", type: "문자열", note: "최대 10자" },
-];
-
-export const employeePolicy: PolicyModule = {
-  id: "employee",
-  moduleName: "임직원 관리",
-  features: "임직원 추가 / 수정 / 삭제",
+export const spsSummaryPolicy: PolicyModule = {
+  id: "sps-summary",
+  moduleName: "사업소득 합산",
+  features: "연도별 월별 사업소득 합산 조회 / 신고파일 다운로드 / 엑셀 업로드",
   screens: [
     {
-      screenId: "HRIS_EP_01",
-      screenName: "리스트 화면",
-      description: "임직원 리스트 조회, 검색, 삭제, 엑셀 다운로드",
-    },
-    {
-      screenId: "HRIS_EP_02",
-      screenName: "추가 팝업",
-      description: "임직원 신규 추가",
-    },
-    {
-      screenId: "HRIS_EP_03",
-      screenName: "수정 팝업",
-      description: "임직원 정보 수정 (사번 읽기 전용)",
+      screenId: "SPS_BI_01",
+      screenName: "합산 화면",
+      description: "선택한 연도의 1월~12월 사업소득 월별 합산 조회",
     },
   ],
   listScreen: {
-    screenId: "HRIS_EP_01",
+    screenId: "SPS_BI_01",
     search: {
-      target: "사번 OR 성명",
-      placeholder: "사번 또는 성명을 입력해주세요.",
-      specialCharAllowed: true,
-    },
-    sort: "최근 등록 순",
-    pageSizeOptions: [15, 30, 50, 100],
-    defaultPageSize: 30,
-    excelFileName: "HIRS_유저_리스트",
-    rowClickAction: "수정 팝업(HRIS_EP_03) 노출, DB PK(id) 전달",
-  },
-  addPopup: {
-    screenId: "HRIS_EP_02",
-    confirmMessage: "임직원 추가를 취소하시겠습니까?",
-    toastMessage: "임직원 추가를 완료했습니다.",
-  },
-  editPopup: {
-    screenId: "HRIS_EP_03",
-    confirmMessage: "임직원 수정을 취소하시겠습니까?",
-    toastMessage: "임직원 수정을 완료했습니다.",
-    readonlyFields: ["사번"],
-  },
-  fields: employeeFields,
-  tableColumns: employeeTableColumns,
-  deletePolicy: {
-    type: "물리삭제",
-    description: [
-      "급여/연말정산 데이터 함께 삭제",
-      "삭제 후 복구 불가",
-      "삭제된 사번은 재사용 가능",
-    ],
-  },
-};
-
-export const workTypePolicy: PolicyModule = {
-  id: "worktype",
-  moduleName: "근로형태 관리",
-  features: "근로형태 추가 / 수정 / 삭제",
-  screens: [
-    {
-      screenId: "HRIS_WT_01",
-      screenName: "리스트 화면",
-      description: "근로형태 리스트 조회, 검색, 삭제, 엑셀 다운로드",
-    },
-    {
-      screenId: "HRIS_WT_02",
-      screenName: "추가 팝업",
-      description: "근로형태 신규 추가",
-    },
-    {
-      screenId: "HRIS_WT_03",
-      screenName: "수정 팝업",
-      description: "근로형태 정보 수정",
-    },
-  ],
-  listScreen: {
-    screenId: "HRIS_WT_01",
-    search: {
-      target: "근로형태명 OR 근로형태 코드",
-      placeholder: "근로형태명 또는 근로형태 코드를 입력해주세요.",
-      maxLength: 10,
+      target: "연도 셀렉박스",
+      placeholder: "연도 선택",
       specialCharAllowed: false,
     },
-    sort: "최근 등록 순",
+    sort: "월 오름차순 (1월~12월 고정)",
     pageSizeOptions: [15, 30, 50, 100],
     defaultPageSize: 30,
-    excelFileName: "HRIS_근로형태_리스트",
-    rowClickAction: "수정 팝업(HRIS_WT_03) 노출, DB PK(id) 전달",
+    excelFileName: "YYYY년_M월_간이지급명세서",
+    rowClickAction: "해당 월의 사업소득 월별 리스트(SPS_BI_02)로 이동",
   },
   addPopup: {
-    screenId: "HRIS_WT_02",
-    confirmMessage: "근로형태 추가를 취소하시겠습니까?",
-    toastMessage: "근로형태 추가를 완료했습니다.",
+    screenId: "SPS_BI_01",
+    confirmMessage: "",
+    toastMessage: "",
   },
   editPopup: {
-    screenId: "HRIS_WT_03",
-    confirmMessage: "근로형태 수정을 취소하시겠습니까?",
-    toastMessage: "근로형태 수정을 완료했습니다.",
+    screenId: "SPS_BI_01",
+    confirmMessage: "",
+    toastMessage: "",
   },
-  fields: workTypeFields,
-  tableColumns: workTypeTableColumns,
+  fields: spsSummaryFields,
+  tableColumns: spsSummaryTableColumns,
   deletePolicy: {
-    type: "물리삭제",
-    description: [
-      "삭제 후 복구 불가",
-      "삭제된 근로형태를 사용 중인 임직원의 근로형태 값을 NULL로 변경",
-    ],
-    warning:
-      "해당 근로형태를 사용 중인 임직원이 N명 있습니다. 삭제 시 해당 임직원의 근로형태가 초기화됩니다. 삭제하시겠습니까?",
+    type: "해당 없음",
+    description: ["합산 화면에서는 삭제 기능 없음"],
   },
   extraPolicies: [
     {
-      title: "임직원 관리 연관 - 근로형태 입력 필드",
-      description:
-        "임직원 추가/수정 팝업에 근로형태 셀렉박스 추가. 단일선택, 근로형태명만 표시, 가나다순 정렬, 선택값(필수 아님).",
+      title: "귀속 기준 예외 규칙",
+      description: "보험설계사(940906)/음료배달(940907)/방문판매원(940908) 업종이면서 귀속연도≠지급연도인 경우, 해당 데이터는 귀속연도 12월 합산에 포함. 12월 하단에 'YYYY년 지급'/'YYYY년 이후 지급' 추가 행 표시.",
     },
     {
-      title: "근로형태 삭제 시 임직원 연관 처리",
-      description:
-        "삭제 시 해당 근로형태가 지정된 임직원의 근로형태 값을 NULL로 변경. 삭제 API에서 연관 처리 수행.",
+      title: "엑셀 업로드",
+      description: ".xlsx/.xls 파일 업로드. 최대 10MB. 행별 검증 후 성공 건만 저장. 실패 목록 다운로드 제공.",
     },
   ],
+  detailedContent: summaryContent,
 };
 
-// ─── 급여항목 ─────────────────────────────────────
+// ─── 사업소득 월별 리스트 (SPS_BI_02) ─────────────────────────────
 
-const payItemFields: PolicyField[] = [
-  {
-    name: "구분",
-    required: true,
-    type: "radio",
-    options: ["지급항목", "공제항목"],
-    description: "선택에 따라 유형 옵션이 변경됨",
-  },
-  {
-    name: "급여코드",
-    required: true,
-    type: "text",
-    maxLength: 10,
-    validation: ["중복 불가 (submit 시점)", "특수문자 불가"],
-    errorMessages: {
-      duplicate: "중복된 급여코드는 사용하실 수 없습니다.",
-      specialChar: "특수문자는 입력하실 수 없습니다.",
-      maxLength: "최대 10자까지 입력 가능합니다.",
-    },
-  },
-  {
-    name: "항목명",
-    required: true,
-    type: "text",
-    maxLength: 30,
-    validation: ["특수문자 불가"],
-    errorMessages: {
-      specialChar: "특수문자는 입력하실 수 없습니다.",
-      maxLength: "최대 30자까지 입력 가능합니다.",
-    },
-  },
-  {
-    name: "유형",
-    required: true,
-    type: "select",
-    description: "구분이 지급항목이면: 기본급, 수당, 상여금. 공제항목이면: 4대보험, 세금, 기타공제.",
-    options: ["기본급", "수당", "상여금", "4대보험", "세금", "기타공제"],
-  },
+const spsMonthlyFields: PolicyField[] = [];
+
+const spsMonthlyTableColumns: TableColumn[] = [
+  { name: "귀속연월", type: "YYYY.MM" },
+  { name: "성명(상호)", type: "문자열", note: "최대 50자" },
+  { name: "주민(사업자)등록번호", type: "문자열", note: "10자리 또는 13자리" },
+  { name: "업종코드", type: "문자열", note: "코드 + 업종명" },
+  { name: "지급액", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "소득세", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "지방소득세", type: "금액", note: "천 단위 콤마 + 원" },
+  { name: "실지급액", type: "금액", note: "천 단위 콤마 + 원" },
 ];
 
-const payItemTableColumns: TableColumn[] = [
-  { name: "구분", type: "ENUM", note: "지급항목 / 공제항목" },
-  { name: "급여코드", type: "문자열", note: "최대 10자" },
-  { name: "항목명", type: "문자열", note: "최대 30자" },
-  { name: "유형", type: "ENUM", note: "구분에 따라 옵션 변동" },
-];
-
-export const payItemPolicy: PolicyModule = {
-  id: "payitem",
-  moduleName: "급여항목 관리",
-  features: "급여항목 추가 / 수정 / 삭제",
+export const spsMonthlyPolicy: PolicyModule = {
+  id: "sps-monthly",
+  moduleName: "사업소득 월별 리스트",
+  features: "월별 사업소득 조회 / 추가 / 수정 / 삭제 / 엑셀 다운로드",
   screens: [
     {
-      screenId: "HRIS_PI_01",
-      screenName: "리스트 화면",
-      description: "급여항목 리스트 조회, 검색, 삭제, 엑셀 다운로드",
+      screenId: "SPS_BI_02",
+      screenName: "월별 리스트 화면",
+      description: "특정 지급연월의 사업소득 상세 리스트 조회, 검색, 삭제, 엑셀 다운로드",
     },
     {
-      screenId: "HRIS_PI_02",
+      screenId: "SPS_BI_03",
       screenName: "추가 팝업",
-      description: "급여항목 신규 추가",
+      description: "사업소득 신규 추가 (자동 세액 계산)",
     },
     {
-      screenId: "HRIS_PI_03",
+      screenId: "SPS_BI_04",
       screenName: "수정 팝업",
-      description: "급여항목 정보 수정 (구분 읽기 전용)",
+      description: "사업소득 수정/삭제 (모든 필드 수정 가능)",
     },
   ],
   listScreen: {
-    screenId: "HRIS_PI_01",
+    screenId: "SPS_BI_02",
     search: {
-      target: "급여코드 OR 항목명",
-      placeholder: "급여코드 또는 항목명을 입력해주세요.",
-      maxLength: 30,
+      target: "성명(상호)",
+      placeholder: "성명(상호)을 입력해주세요.",
+      maxLength: 50,
       specialCharAllowed: false,
     },
     sort: "최근 등록 순",
     pageSizeOptions: [15, 30, 50, 100],
     defaultPageSize: 30,
-    excelFileName: "HRIS_급여항목_리스트",
-    rowClickAction: "수정 팝업(HRIS_PI_03) 노출, DB PK(id) 전달",
+    excelFileName: "사업소득_YYYY년_M월",
+    rowClickAction: "수정 팝업(SPS_BI_04) 노출",
   },
   addPopup: {
-    screenId: "HRIS_PI_02",
-    confirmMessage: "급여항목 추가를 취소하시겠습니까?",
-    toastMessage: "급여항목 추가를 완료했습니다.",
+    screenId: "SPS_BI_03",
+    confirmMessage: "사업소득 추가를 취소하시겠습니까?",
+    toastMessage: "사업소득 추가를 완료했습니다.",
   },
   editPopup: {
-    screenId: "HRIS_PI_03",
-    confirmMessage: "급여항목 수정을 취소하시겠습니까?",
-    toastMessage: "급여항목 수정을 완료했습니다.",
-    readonlyFields: ["구분"],
+    screenId: "SPS_BI_04",
+    confirmMessage: "사업소득 수정을 취소하시겠습니까?",
+    toastMessage: "사업소득 수정을 완료했습니다.",
   },
-  fields: payItemFields,
-  tableColumns: payItemTableColumns,
+  fields: spsMonthlyFields,
+  tableColumns: spsMonthlyTableColumns,
   deletePolicy: {
     type: "물리삭제",
     description: [
       "삭제 후 복구 불가",
-      "확정된 급여대장에서 사용 중인 급여항목은 삭제 불가",
+      "선택 삭제 및 전체 삭제 지원",
     ],
-    warning: "확정된 급여대장에서 사용 중인 항목이 포함되어 있어 삭제할 수 없습니다.",
+    warning: "삭제한 정보는 복구할 수 없습니다.",
   },
+  extraPolicies: [
+    {
+      title: "상단 요약 정보",
+      description: "항상 전체 데이터(검색/페이징 무관) 기준으로 건수, 총 지급액, 총 소득세, 총 지방소득세, 총 실지급액 표시.",
+    },
+    {
+      title: "엑셀 다운로드 모드",
+      description: "전체 다운로드 / 검색 결과 다운로드 / 선택 다운로드 3가지 모드 제공.",
+    },
+    {
+      title: "전체 삭제",
+      description: "해당 지급연월의 모든 사업소득을 일괄 삭제. 확인 다이얼로그 제공.",
+    },
+    {
+      title: "예외 업종 12월 지급 합류 규칙",
+      description: "예외 업종(940906/907/908)에서 귀속연도=지급연도이고 지급월이 12월인 데이터는, 동일 귀속연월+주민번호+업종코드로 귀속연도≠지급연도인 예외 데이터가 존재할 경우 해당 그룹에 합산하여 표시.",
+    },
+  ],
+  detailedContent: monthlyContent,
 };
 
-// ─── 급여대장 ─────────────────────────────────────
+// ─── 사업소득 추가 팝업 (SPS_BI_03) ─────────────────────────────
 
-const payrollFields: PolicyField[] = [
-  {
-    name: "급여대장명",
-    required: true,
-    type: "text",
-    maxLength: 50,
-    validation: ["최대 글자 수 초과 검사"],
-    errorMessages: {
-      maxLength: "최대 50자까지 입력 가능합니다.",
-    },
-  },
+const spsAddFields: PolicyField[] = [
   {
     name: "귀속연도",
     required: true,
     type: "select",
-    options: ["2024", "2025", "2026"],
-    description: "드롭다운 선택",
+    options: ["2025", "2026"],
+    description: "2025년 ~ 현재연도. placeholder: \"선택\".",
   },
   {
     name: "귀속월",
     required: true,
     type: "select",
     options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
-    description: "드롭다운 선택",
+    description: "1월~12월. placeholder: \"선택\".",
   },
   {
-    name: "지급일자",
+    name: "성명(상호)",
     required: true,
-    type: "date",
-    description: "YYYY-MM-DD. 귀속연월 이후 날짜만 허용.",
-    validation: ["지급일자 >= 귀속연월 첫째날"],
-    errorMessages: { invalid: "지급일자는 귀속연월 이후여야 합니다." },
+    type: "text",
+    maxLength: 50,
+    validation: ["허용 문자: 한글·영문·숫자·공백·&·'·-·.·(가운뎃점)", "공백만 입력 시 필수 에러"],
+    errorMessages: { required: "필수 입력 항목입니다." },
+    description: "허용되지 않은 문자는 입력 불가.",
+  },
+  {
+    name: "내외국인 구분",
+    required: true,
+    type: "radio",
+    options: ["내국인", "외국인"],
+    description: "기본값: 내국인.",
+  },
+  {
+    name: "주민(사업자)등록번호",
+    required: true,
+    type: "text",
+    maxLength: 13,
+    validation: [
+      "숫자만 입력 가능",
+      "10자리 또는 13자리만 허용",
+      "체크디짓 알고리즘 검증",
+      "병의원(851101) 선택 시 10자리 이하만 허용",
+    ],
+    errorMessages: {
+      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
+      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
+      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
+    },
+  },
+  {
+    name: "업종코드",
+    required: true,
+    type: "select",
+    description: "40개 업종코드 목록 중 선택. placeholder: \"선택\".",
+  },
+  {
+    name: "지급액",
+    required: true,
+    type: "number",
+    description: "0 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
+    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거"],
+    errorMessages: { required: "필수 입력 항목입니다." },
   },
 ];
 
-const payrollTableColumns: TableColumn[] = [
-  { name: "급여대장명", type: "문자열", note: "최대 50자" },
-  { name: "귀속연도", type: "숫자" },
-  { name: "귀속월", type: "숫자" },
-  { name: "지급일자", type: "YYYY-MM-DD" },
-  { name: "확정여부", type: "ENUM", note: "확정 / 미확정" },
-  { name: "수정", type: "버튼", note: "수정 팝업 열기" },
+const spsAddTableColumns: TableColumn[] = [
+  { name: "세율(%)", type: "퍼센트", note: "기본 3%, 봉사료 5%, 외국인+운동가 3%/20% 선택" },
+  { name: "소득세", type: "금액", note: "지급액 × 세율 (절사). 소액부징수: <1,000원 → 0원" },
+  { name: "지방소득세", type: "금액", note: "소득세 × 0.1 (절사). 소득세 0원이면 0원" },
+  { name: "실지급액", type: "금액", note: "지급액 - 소득세 - 지방소득세" },
 ];
 
-export const payrollPolicy: PolicyModule = {
-  id: "payroll",
-  moduleName: "급여대장 관리",
-  features: "급여대장 추가 / 수정 / 삭제 / 확정·해제",
+export const spsAddPolicy: PolicyModule = {
+  id: "sps-add",
+  moduleName: "사업소득 추가 팝업",
+  features: "사업소득 신규 추가 / 자동 세액 계산 / 귀속 기준 예외 확인",
   screens: [
     {
-      screenId: "HRIS_PR_01",
-      screenName: "리스트 화면",
-      description: "급여대장 리스트 조회, 검색, 삭제, 엑셀 다운로드",
-    },
-    {
-      screenId: "HRIS_PR_02",
+      screenId: "SPS_BI_03",
       screenName: "추가 팝업",
-      description: "급여대장 신규 추가",
-    },
-    {
-      screenId: "HRIS_PR_03",
-      screenName: "수정 팝업",
-      description: "급여대장 정보 수정 (확정 시 readonly)",
+      description: "사업소득 데이터 추가. 입력 시 세율·소득세·지방소득세·실지급액 자동 계산.",
     },
   ],
   listScreen: {
-    screenId: "HRIS_PR_01",
-    search: {
-      target: "급여대장명",
-      placeholder: "급여대장명을 입력해주세요.",
-      specialCharAllowed: true,
-    },
-    sort: "최근 등록 순",
-    pageSizeOptions: [15, 30, 50, 100],
-    defaultPageSize: 30,
-    excelFileName: "HRIS_급여대장_리스트",
-    rowClickAction: "급여내역 상세 화면으로 이동 (payrollId 전달)",
+    screenId: "SPS_BI_03",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "",
+    rowClickAction: "",
   },
   addPopup: {
-    screenId: "HRIS_PR_02",
-    confirmMessage: "급여대장 추가를 취소하시겠습니까?",
-    toastMessage: "급여대장 추가를 완료했습니다.",
+    screenId: "SPS_BI_03",
+    confirmMessage: "사업소득 추가를 취소하시겠습니까?",
+    toastMessage: "사업소득 추가를 완료했습니다.",
   },
   editPopup: {
-    screenId: "HRIS_PR_03",
-    confirmMessage: "급여대장 수정을 취소하시겠습니까?",
-    toastMessage: "급여대장 수정을 완료했습니다.",
-    readonlyFields: ["확정된 급여대장의 모든 필드"],
+    screenId: "SPS_BI_03",
+    confirmMessage: "",
+    toastMessage: "",
   },
-  fields: payrollFields,
-  tableColumns: payrollTableColumns,
+  fields: spsAddFields,
+  tableColumns: spsAddTableColumns,
+  deletePolicy: {
+    type: "해당 없음",
+    description: ["추가 팝업에서는 삭제 기능 없음"],
+  },
+  extraPolicies: [
+    {
+      title: "세율 결정 로직",
+      description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택 (기본 3%).",
+    },
+    {
+      title: "소액부징수",
+      description: "소득세가 1,000원 미만이면 소득세=0원, 지방소득세=0원.",
+    },
+    {
+      title: "중복 검사",
+      description: "submit 시 귀속연월 + 주민(사업자)등록번호 + 업종코드가 동일한 데이터 존재 시 등록 차단.",
+    },
+    {
+      title: "귀속 기준 예외 확인",
+      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도 시 confirm: \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\"",
+    },
+  ],
+  detailedContent: addContent,
+};
+
+// ─── 사업소득 수정 팝업 (SPS_BI_04) ─────────────────────────────
+
+const spsEditFields: PolicyField[] = [
+  {
+    name: "귀속연도",
+    required: true,
+    type: "select",
+    description: "수정 가능. 2025년 ~ 현재연도.",
+  },
+  {
+    name: "귀속월",
+    required: true,
+    type: "select",
+    description: "수정 가능. 1월~12월.",
+  },
+  {
+    name: "성명(상호)",
+    required: true,
+    type: "text",
+    maxLength: 50,
+    description: "수정 가능. 허용 문자: 한글·영문·숫자·공백·허용 특수문자.",
+    validation: ["허용 문자: 한글·영문·숫자·공백·&·'·-·.·(가운뎃점)", "공백만 입력 시 필수 에러"],
+    errorMessages: { required: "필수 입력 항목입니다." },
+  },
+  {
+    name: "내외국인 구분",
+    required: true,
+    type: "radio",
+    options: ["내국인", "외국인"],
+    description: "수정 가능. 변경 시 세율 조건부 전환 트리거.",
+  },
+  {
+    name: "주민(사업자)등록번호",
+    required: true,
+    type: "text",
+    maxLength: 13,
+    description: "수정 가능. 마스킹 없이 전체 표시.",
+    validation: [
+      "숫자만 입력 가능",
+      "10자리 또는 13자리만 허용",
+      "체크디짓 알고리즘 검증",
+      "병의원(851101) 선택 시 10자리 이하만 허용",
+    ],
+    errorMessages: {
+      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
+      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
+      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
+    },
+  },
+  {
+    name: "업종코드",
+    required: true,
+    type: "select",
+    description: "수정 가능.",
+  },
+  {
+    name: "지급액",
+    required: true,
+    type: "number",
+    description: "수정 가능. 0 이상 정수, 최대 12자리.",
+  },
+];
+
+const spsEditTableColumns: TableColumn[] = [
+  { name: "세율(%)", type: "퍼센트", note: "추가 팝업과 동일 로직" },
+  { name: "소득세", type: "금액", note: "자동 계산" },
+  { name: "지방소득세", type: "금액", note: "자동 계산" },
+  { name: "실지급액", type: "금액", note: "자동 계산" },
+];
+
+export const spsEditPolicy: PolicyModule = {
+  id: "sps-edit",
+  moduleName: "사업소득 수정 팝업",
+  features: "사업소득 수정 / 삭제 / 모든 필드 수정 가능 / 자동 세액 재계산",
+  screens: [
+    {
+      screenId: "SPS_BI_04",
+      screenName: "수정 팝업",
+      description: "기존 사업소득 데이터 수정 또는 삭제. 모든 필드(귀속연월/성명/내외국인/주민번호/업종코드/지급액) 수정 가능.",
+    },
+  ],
+  listScreen: {
+    screenId: "SPS_BI_04",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "",
+    rowClickAction: "",
+  },
+  addPopup: {
+    screenId: "SPS_BI_04",
+    confirmMessage: "",
+    toastMessage: "",
+  },
+  editPopup: {
+    screenId: "SPS_BI_04",
+    confirmMessage: "사업소득 수정을 취소하시겠습니까?",
+    toastMessage: "사업소득 수정을 완료했습니다.",
+  },
+  fields: spsEditFields,
+  tableColumns: spsEditTableColumns,
   deletePolicy: {
     type: "물리삭제",
     description: [
       "삭제 후 복구 불가",
-      "확정된 급여대장은 삭제 불가",
-      "급여내역 데이터 함께 삭제",
+      "조건 없이 항상 삭제 가능",
     ],
-    warning: "확정된 급여대장은 삭제할 수 없습니다.",
+    warning: "사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.",
   },
   extraPolicies: [
     {
-      title: "급여대장 확정/해제",
-      description: "확정 시 급여대장 수정/삭제 불가. 급여내역 상세에서 확정/해제 토글.",
+      title: "세율 결정 로직",
+      description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택 (기본 3%). 내외국인 변경 시 세율 조건부 전환 트리거.",
     },
     {
-      title: "행 클릭 동작",
-      description: "급여대장 리스트에서 행 클릭 시 급여내역 상세 페이지로 이동. 수정 팝업은 별도 수정 버튼으로 접근.",
+      title: "소액부징수",
+      description: "소득세가 1,000원 미만이면 소득세=0원, 지방소득세=0원.",
+    },
+    {
+      title: "삭제 동작",
+      description: "삭제 완료 시 토스트 노출 후 SPS_BI_02 리스트 초기 상태로 복귀.",
+    },
+    {
+      title: "중복 검사",
+      description: "submit 시 자기 자신을 제외하고 귀속연월 + 주민번호 + 업종코드 중복 검사.",
+    },
+    {
+      title: "귀속 기준 예외 확인",
+      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도 시 confirm: \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\"",
     },
   ],
+  detailedContent: editContent,
 };
 
-// ─── 급여내역 상세 ─────────────────────────────────────
+// ─── 사업소득 엑셀 업로드 ─────────────────────────────
 
-const payrollDetailFields: PolicyField[] = [
-  {
-    name: "사번",
-    required: true,
-    type: "text",
-    description: "임직원 추가 팝업에서 선택",
-  },
-  {
-    name: "성명",
-    required: true,
-    type: "text",
-    description: "임직원 추가 시 자동 입력",
-  },
-  {
-    name: "급여항목별 금액",
-    required: false,
-    type: "number",
-    description: "활성화된 급여항목별 금액 입력. 콤마 포맷.",
-  },
+const spsExcelFields: PolicyField[] = [
+  { name: "성명(상호)", required: true, type: "text", maxLength: 50 },
+  { name: "귀속연도", required: true, type: "number", description: "정수" },
+  { name: "귀속월", required: true, type: "number", description: "1~12" },
+  { name: "지급연도", required: true, type: "number", description: "정수" },
+  { name: "지급월", required: true, type: "number", description: "1~12" },
+  { name: "주민(사업자)등록번호", required: true, type: "text", maxLength: 13 },
+  { name: "내외국인", required: true, type: "enum", options: ["N", "Y"] },
+  { name: "업종코드", required: true, type: "text", description: "유효한 업종코드" },
+  { name: "지급총액", required: true, type: "number", description: "양의 정수, 최대 12자리" },
+  { name: "세율", required: false, type: "number", description: "외국인+직업운동가인 경우만 필수 (3 또는 20)" },
 ];
 
-const payrollDetailTableColumns: TableColumn[] = [
-  { name: "사번", type: "문자열" },
-  { name: "성명", type: "문자열" },
-  { name: "(동적) 지급항목들", type: "숫자", note: "활성화된 지급항목 컬럼" },
-  { name: "지급합계", type: "숫자", note: "지급항목 합산" },
-  { name: "(동적) 공제항목들", type: "숫자", note: "활성화된 공제항목 컬럼" },
-  { name: "공제합계", type: "숫자", note: "공제항목 합산" },
-];
+const spsExcelTableColumns: TableColumn[] = [];
 
-export const payrollDetailPolicy: PolicyModule = {
-  id: "payroll-detail",
-  moduleName: "급여내역 상세",
-  features: "급여내역 조회 / 임직원 추가·삭제 / 급여항목 관리 / 급여확정·해제",
+export const spsExcelPolicy: PolicyModule = {
+  id: "sps-excel",
+  moduleName: "사업소득 엑셀 업로드",
+  features: "엑셀 파일로 사업소득 대량 업로드 / 행별 검증 / 실패 목록 다운로드",
   screens: [
     {
-      screenId: "HRIS_PD_01",
-      screenName: "리스트 화면",
-      description: "급여내역 상세 리스트 (동적 컬럼)",
-    },
-    {
-      screenId: "HRIS_PD_02",
-      screenName: "임직원 추가 팝업",
-      description: "급여대장에 임직원 추가 (귀속연월 겹침 필터)",
-    },
-    {
-      screenId: "HRIS_PD_03",
-      screenName: "급여항목 관리 팝업",
-      description: "급여항목 활성/비활성 토글",
-    },
-    {
-      screenId: "HRIS_PD_04",
-      screenName: "상세 수정 팝업",
-      description: "임직원별 급여 금액 수정",
+      screenId: "SPS_BI_01",
+      screenName: "엑셀 업로드",
+      description: "사업소득 합산 화면에서 엑셀 파일 업로드. .xlsx/.xls만 허용, 최대 10MB.",
     },
   ],
   listScreen: {
-    screenId: "HRIS_PD_01",
-    search: {
-      target: "사번 OR 성명",
-      placeholder: "사번 또는 성명을 입력해주세요.",
-      specialCharAllowed: true,
-    },
-    sort: "사번 오름차순",
-    pageSizeOptions: [15, 30, 50, 100],
-    defaultPageSize: 30,
-    excelFileName: "HRIS_급여내역_리스트",
-    rowClickAction: "상세 수정 팝업(HRIS_PD_04) 노출",
+    screenId: "SPS_BI_01",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "사업소득업로드_실패목록_YYYYMMDD",
+    rowClickAction: "",
   },
   addPopup: {
-    screenId: "HRIS_PD_02",
-    confirmMessage: "임직원 추가를 취소하시겠습니까?",
-    toastMessage: "임직원 추가를 완료했습니다.",
+    screenId: "SPS_BI_01",
+    confirmMessage: "",
+    toastMessage: "사업소득 엑셀 업로드를 완료했습니다.",
   },
   editPopup: {
-    screenId: "HRIS_PD_04",
-    confirmMessage: "급여내역 수정을 취소하시겠습니까?",
-    toastMessage: "급여내역 수정을 완료했습니다.",
-    readonlyFields: ["확정된 급여대장의 모든 필드"],
+    screenId: "SPS_BI_01",
+    confirmMessage: "",
+    toastMessage: "",
   },
-  fields: payrollDetailFields,
-  tableColumns: payrollDetailTableColumns,
+  fields: spsExcelFields,
+  tableColumns: spsExcelTableColumns,
   deletePolicy: {
-    type: "물리삭제",
-    description: [
-      "급여내역에서 임직원 삭제",
-      "확정된 급여대장에서는 삭제 불가",
-    ],
+    type: "해당 없음",
+    description: ["엑셀 업로드에서는 삭제 기능 없음"],
   },
   extraPolicies: [
     {
-      title: "동적 컬럼",
-      description: "급여항목 관리에서 활성화된 항목만 테이블 컬럼으로 표시. 지급항목 → 지급합계 → 공제항목 → 공제합계 순서.",
+      title: "파일 사양",
+      description: ".xlsx/.xls만 허용. 최대 10MB. 단일 파일만 업로드 가능. Row 13부터 데이터.",
     },
     {
-      title: "급여확정/해제",
-      description: "확정 시 모든 편집 비활성화 (임직원 추가/삭제, 금액 수정, 항목 관리). 해제 시 편집 가능 상태로 복원.",
+      title: "행별 검증",
+      description: "성공 행은 즉시 저장, 실패 행은 건너뜀. 검증 순서: 필수값 → 연도/월 범위 → 귀속≤지급 → 내외국인 → 업종코드 → 금액 → 자릿수 → 체크디짓 → 세율 → 중복.",
     },
     {
-      title: "임직원 추가 필터",
-      description: "귀속연월과 근무기간이 겹치는 임직원 중 미추가 임직원만 추가 가능.",
+      title: "결과 화면",
+      description: "전체/성공/실패 건수 표시. 실패 목록(주민번호+사유) 표시. 실패 데이터 다운로드 버튼 제공.",
     },
   ],
+  detailedContent: excelContent,
 };
 
-export const allPolicies: PolicyModule[] = [workTypePolicy, employeePolicy, payItemPolicy, payrollPolicy, payrollDetailPolicy];
+// ─── 전체 사업소득 (SPS_BI_05) ─────────────────────────────
+
+const spsAllListTableColumns: TableColumn[] = [
+  { name: "귀속연도", type: "YYYY년", note: "좌측 정렬" },
+  { name: "귀속월", type: "MM월", note: "좌측 정렬" },
+  { name: "지급연도", type: "YYYY년", note: "좌측 정렬" },
+  { name: "지급월", type: "MM월", note: "좌측 정렬" },
+  { name: "성명(상호)", type: "문자열", note: "좌측 정렬" },
+  { name: "주민(사업자)등록번호", type: "문자열", note: "마스킹 없이 전체 표시" },
+  { name: "업종코드", type: "문자열", note: "좌측 정렬" },
+  { name: "지급액", type: "금액", note: "천 단위 콤마 + 원, 우측 정렬" },
+  { name: "소득세", type: "금액", note: "천 단위 콤마 + 원, 우측 정렬" },
+  { name: "지방소득세", type: "금액", note: "천 단위 콤마 + 원, 우측 정렬" },
+  { name: "실지급액", type: "금액", note: "천 단위 콤마 + 원, 우측 정렬" },
+];
+
+export const spsAllListPolicy: PolicyModule = {
+  id: "sps-all-list",
+  moduleName: "전체 사업소득",
+  features: "전체 사업소득 조회 / 검색 / 추가 / 수정 / 삭제 / 엑셀 다운로드 / 엑셀 업로드",
+  screens: [
+    {
+      screenId: "SPS_BI_05",
+      screenName: "전체 사업소득 화면",
+      description: "등록된 모든 사업소득 데이터를 월별 필터 없이 조회·관리. 귀속 예외 규칙 미적용, 원본 값 그대로 표시.",
+    },
+    {
+      screenId: "SPS_BI_06",
+      screenName: "전체 사업소득 추가 팝업",
+      description: "지급연도/지급월을 포함한 사업소득 신규 추가 (자동 세액 계산)",
+    },
+    {
+      screenId: "SPS_BI_07",
+      screenName: "전체 사업소득 수정 팝업",
+      description: "모든 필드 수정 가능, 지급액 0원 허용, 삭제 기능 포함",
+    },
+  ],
+  listScreen: {
+    screenId: "SPS_BI_05",
+    search: {
+      target: "성명(상호)",
+      placeholder: "성명(상호)를 입력해주세요.",
+      maxLength: 50,
+      specialCharAllowed: false,
+    },
+    sort: "최근 등록 순",
+    pageSizeOptions: [15, 30, 50, 100],
+    defaultPageSize: 30,
+    excelFileName: "전체 사업소득",
+    rowClickAction: "수정 팝업(SPS_BI_07) 노출",
+  },
+  addPopup: {
+    screenId: "SPS_BI_06",
+    confirmMessage: "사업소득 추가를 취소하시겠습니까?",
+    toastMessage: "사업소득 추가를 완료했습니다.",
+  },
+  editPopup: {
+    screenId: "SPS_BI_07",
+    confirmMessage: "사업소득 수정을 취소하시겠습니까?",
+    toastMessage: "사업소득 수정을 완료했습니다.",
+  },
+  fields: [],
+  tableColumns: spsAllListTableColumns,
+  deletePolicy: {
+    type: "물리삭제",
+    description: [
+      "삭제 후 복구 불가",
+      "선택 삭제 지원",
+      "SPS_BI_01/SPS_BI_02 화면과 데이터 연동",
+    ],
+    warning: "총 N개의 리스트를 삭제하시겠습니까?",
+  },
+  extraPolicies: [
+    {
+      title: "데이터 표시 규칙",
+      description: "귀속 기준 예외 규칙 미적용. 모든 데이터를 저장된 원본 값(귀속연도/귀속월/지급연도/지급월) 그대로 표시.",
+    },
+    {
+      title: "데이터 연동",
+      description: "추가/수정/삭제 시 SPS_BI_01(사업소득 합산) 및 SPS_BI_02(사업소득 월별 리스트) 화면과 양방향 연동.",
+    },
+    {
+      title: "엑셀 다운로드 규칙",
+      description: "검색하지 않았을 경우: 전체 리스트. 검색했을 경우: 검색 결과. 리스트 선택 후 클릭 시: 선택한 리스트만. 금액은 숫자 형식(콤마/'원' 없이) 저장.",
+    },
+    {
+      title: "엑셀 업로드",
+      description: "SPS_BI_01 엑셀 업로드 기능과 동일. 업로드 완료 후 전체 사업소득 리스트 자동 갱신.",
+    },
+  ],
+  detailedContent: allListContent,
+};
+
+// ─── 전체 사업소득 추가 팝업 (SPS_BI_06) ─────────────────────────────
+
+const spsAllAddFields: PolicyField[] = [
+  {
+    name: "지급연도",
+    required: true,
+    type: "select",
+    options: ["2025", "2026", "2027"],
+    description: "2025년 ~ (현재연도 + 1)년. placeholder: \"선택\".",
+  },
+  {
+    name: "지급월",
+    required: true,
+    type: "select",
+    options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+    description: "1월~12월. placeholder: \"선택\".",
+  },
+  {
+    name: "귀속연도",
+    required: true,
+    type: "select",
+    options: ["2025", "2026"],
+    description: "2025년 ~ 현재연도. placeholder: \"선택\".",
+  },
+  {
+    name: "귀속월",
+    required: true,
+    type: "select",
+    options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+    description: "1월~12월. placeholder: \"선택\".",
+  },
+  {
+    name: "성명(상호)",
+    required: true,
+    type: "text",
+    maxLength: 50,
+    validation: ["허용 문자: 한글·영문·숫자·공백·&·'·-·.·(가운뎃점)", "공백만 입력 시 필수 에러"],
+    errorMessages: { required: "필수 입력 항목입니다." },
+    description: "허용되지 않은 문자는 입력 불가.",
+  },
+  {
+    name: "내외국인 구분",
+    required: true,
+    type: "radio",
+    options: ["내국인", "외국인"],
+    description: "기본값: 내국인.",
+  },
+  {
+    name: "주민(사업자)등록번호",
+    required: true,
+    type: "text",
+    maxLength: 13,
+    validation: [
+      "숫자만 입력 가능",
+      "10자리 또는 13자리만 허용",
+      "체크디짓 알고리즘 검증",
+      "병의원(851101) 선택 시 10자리 이하만 허용",
+    ],
+    errorMessages: {
+      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
+      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
+      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
+    },
+  },
+  {
+    name: "업종코드",
+    required: true,
+    type: "select",
+    description: "40개 업종코드 목록 중 선택. placeholder: \"선택\".",
+  },
+  {
+    name: "지급액",
+    required: true,
+    type: "number",
+    description: "0 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
+    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거"],
+    errorMessages: { required: "필수 입력 항목입니다." },
+  },
+];
+
+const spsAllAddCalcColumns: TableColumn[] = [
+  { name: "세율(%)", type: "퍼센트", note: "기본 3%, 봉사료 5%, 외국인+운동가 3%/20% 선택" },
+  { name: "소득세", type: "금액", note: "지급액 × 세율 (절사). 소액부징수: <1,000원 → 0원" },
+  { name: "지방소득세", type: "금액", note: "소득세 × 0.1 (절사). 소득세 0원이면 0원" },
+  { name: "실지급액", type: "금액", note: "지급액 - 소득세 - 지방소득세" },
+];
+
+export const spsAllAddPolicy: PolicyModule = {
+  id: "sps-all-add",
+  moduleName: "전체 사업소득 추가 팝업",
+  features: "사업소득 신규 추가 / 지급연도·지급월 직접 입력 / 자동 세액 계산 / 귀속 기준 예외 확인",
+  screens: [
+    {
+      screenId: "SPS_BI_06",
+      screenName: "전체 사업소득 추가 팝업",
+      description: "SPS_BI_03과 동일 기능 + 지급연도/지급월 입력 필드 추가. 특정 지급연월에 종속되지 않음.",
+    },
+  ],
+  listScreen: {
+    screenId: "SPS_BI_06",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "",
+    rowClickAction: "",
+  },
+  addPopup: {
+    screenId: "SPS_BI_06",
+    confirmMessage: "사업소득 추가를 취소하시겠습니까?",
+    toastMessage: "사업소득 추가를 완료했습니다.",
+  },
+  editPopup: {
+    screenId: "SPS_BI_06",
+    confirmMessage: "",
+    toastMessage: "",
+  },
+  fields: spsAllAddFields,
+  tableColumns: spsAllAddCalcColumns,
+  deletePolicy: {
+    type: "해당 없음",
+    description: ["추가 팝업에서는 삭제 기능 없음"],
+  },
+  extraPolicies: [
+    {
+      title: "SPS_BI_03 대비 차이점",
+      description: "지급연도(2025~현재+1)와 지급월(1~12)을 사용자가 직접 셀렉트박스로 선택. SPS_BI_03에서는 부모 화면이 고정값을 전달.",
+    },
+    {
+      title: "귀속연월 유효성",
+      description: "지급연월과 귀속연월이 모두 선택된 상태에서 blur 시 검사. 귀속연월 > 지급연월이면 에러: \"귀속연월은 지급연월보다 이전 날짜여야합니다.\"",
+    },
+    {
+      title: "세율 결정 로직",
+      description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택 (기본 3%).",
+    },
+    {
+      title: "소액부징수",
+      description: "소득세가 1,000원 미만이면 소득세=0원, 지방소득세=0원.",
+    },
+    {
+      title: "중복 검사",
+      description: "submit 시 입력한 지급연월 기준으로 귀속연월 + 주민(사업자)등록번호 + 업종코드가 동일한 데이터 존재 시 등록 차단.",
+    },
+    {
+      title: "귀속 기준 예외 확인",
+      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도 시 confirm: \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\"",
+    },
+  ],
+  detailedContent: allAddContent,
+};
+
+// ─── 전체 사업소득 수정 팝업 (SPS_BI_07) ─────────────────────────────
+
+const spsAllEditFields: PolicyField[] = [
+  {
+    name: "지급연도",
+    required: true,
+    type: "select",
+    description: "수정 가능. 2025년 ~ (현재연도 + 1)년.",
+  },
+  {
+    name: "지급월",
+    required: true,
+    type: "select",
+    description: "수정 가능. 1월~12월.",
+  },
+  {
+    name: "귀속연도",
+    required: true,
+    type: "select",
+    description: "수정 가능. 2025년 ~ 현재연도.",
+  },
+  {
+    name: "귀속월",
+    required: true,
+    type: "select",
+    description: "수정 가능. 1월~12월.",
+  },
+  {
+    name: "성명(상호)",
+    required: true,
+    type: "text",
+    maxLength: 50,
+    description: "수정 가능. 허용 문자: 한글·영문·숫자·공백·허용 특수문자.",
+  },
+  {
+    name: "내외국인 구분",
+    required: true,
+    type: "radio",
+    description: "수정 가능. 변경 시 세율 조건부 전환 트리거.",
+  },
+  {
+    name: "주민(사업자)등록번호",
+    required: true,
+    type: "text",
+    maxLength: 13,
+    description: "수정 가능. 마스킹 없이 전체 표시.",
+    validation: [
+      "숫자만 입력 가능",
+      "10자리 또는 13자리만 허용",
+      "체크디짓 알고리즘 검증",
+      "병의원(851101) 선택 시 10자리 이하만 허용",
+    ],
+    errorMessages: {
+      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
+      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
+      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
+    },
+  },
+  {
+    name: "업종코드",
+    required: true,
+    type: "select",
+    description: "수정 가능.",
+  },
+  {
+    name: "지급액",
+    required: true,
+    type: "number",
+    description: "수정 가능. 0원 입력 허용. 최대 12자리.",
+  },
+];
+
+const spsAllEditCalcColumns: TableColumn[] = [
+  { name: "세율(%)", type: "퍼센트", note: "추가 팝업과 동일 로직" },
+  { name: "소득세", type: "금액", note: "자동 계산" },
+  { name: "지방소득세", type: "금액", note: "자동 계산" },
+  { name: "실지급액", type: "금액", note: "자동 계산" },
+];
+
+export const spsAllEditPolicy: PolicyModule = {
+  id: "sps-all-edit",
+  moduleName: "전체 사업소득 수정 팝업",
+  features: "사업소득 수정 / 삭제 / 모든 필드 수정 가능 / 자동 세액 재계산",
+  screens: [
+    {
+      screenId: "SPS_BI_07",
+      screenName: "전체 사업소득 수정 팝업",
+      description: "모든 필드(지급연월/귀속연월/성명/내외국인/주민번호/업종코드/지급액) 수정 가능. 지급액 0원 허용.",
+    },
+  ],
+  listScreen: {
+    screenId: "SPS_BI_07",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "",
+    rowClickAction: "",
+  },
+  addPopup: {
+    screenId: "SPS_BI_07",
+    confirmMessage: "",
+    toastMessage: "",
+  },
+  editPopup: {
+    screenId: "SPS_BI_07",
+    confirmMessage: "사업소득 수정을 취소하시겠습니까?",
+    toastMessage: "사업소득 수정을 완료했습니다.",
+  },
+  fields: spsAllEditFields,
+  tableColumns: spsAllEditCalcColumns,
+  deletePolicy: {
+    type: "물리삭제",
+    description: [
+      "항상 삭제 가능 (삭제 불가능한 경우 없음)",
+      "삭제 후 SPS_BI_05 화면으로 이동 (초기 상태 리셋)",
+    ],
+    warning: "사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.",
+  },
+  extraPolicies: [
+    {
+      title: "SPS_BI_04 대비 차이점",
+      description: "지급연도/지급월이 표시되고 수정 가능. 성명·내외국인·주민번호도 수정 가능. 삭제 후 SPS_BI_05로 이동(SPS_BI_04는 SPS_BI_02로 이동).",
+    },
+    {
+      title: "SPS_BI_06 대비 차이점",
+      description: "지급액 0원 허용. 삭제 기능(항상 삭제 가능). 중복 검사 시 자기 자신 제외.",
+    },
+    {
+      title: "에러 시 수정 버튼 비활성화",
+      description: "유효성 에러가 1건 이상 존재하면 수정 버튼 비활성화. 모든 에러 해소 시 활성화.",
+    },
+    {
+      title: "중복 검사",
+      description: "submit 시 자기 자신을 제외하고 입력한 지급연월 기준으로 귀속연월 + 주민번호 + 업종코드 중복 검사.",
+    },
+    {
+      title: "삭제 동작",
+      description: "삭제 버튼 클릭 → confirm → 삭제 처리 → 토스트(\"삭제 완료되었습니다.\") → SPS_BI_05 초기 상태 리셋. 변경사항 존재 여부 무관하게 바로 삭제 confirm.",
+    },
+  ],
+  detailedContent: allEditContent,
+};
+
+// ─── 사업소득 그룹 수정 팝업 (SPS_BI_08) ─────────────────────────────
+
+const spsGroupEditFields: PolicyField[] = [
+  {
+    name: "귀속연도",
+    required: true,
+    type: "select",
+    description: "수정 가능. 2025년 ~ 현재연도.",
+  },
+  {
+    name: "귀속월",
+    required: true,
+    type: "select",
+    description: "수정 가능. 1월~12월.",
+  },
+  {
+    name: "성명(상호)",
+    required: true,
+    type: "text",
+    maxLength: 50,
+    description: "수정 가능. 허용 문자: 한글·영문·숫자·공백·허용 특수문자.",
+    validation: ["허용 문자: 한글·영문·숫자·공백·&·'·-·.·(가운뎃점)", "공백만 입력 시 필수 에러"],
+    errorMessages: { required: "필수 입력 항목입니다." },
+  },
+  {
+    name: "내외국인 구분",
+    required: true,
+    type: "radio",
+    options: ["내국인", "외국인"],
+    description: "수정 가능. 변경 시 세율 조건부 전환 트리거.",
+  },
+  {
+    name: "주민(사업자)등록번호",
+    required: true,
+    type: "text",
+    maxLength: 13,
+    description: "수정 가능. 마스킹 없이 전체 표시.",
+    validation: [
+      "숫자만 입력 가능",
+      "10자리 또는 13자리만 허용",
+      "체크디짓 알고리즘 검증",
+      "병의원(851101) 선택 시 10자리 이하만 허용",
+    ],
+    errorMessages: {
+      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
+      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
+      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
+    },
+  },
+  {
+    name: "업종코드",
+    required: true,
+    type: "select",
+    description: "수정 가능.",
+  },
+  {
+    name: "지급액",
+    required: true,
+    type: "number",
+    description: "수정 가능. 0 이상 정수, 최대 12자리.",
+  },
+];
+
+const spsGroupEditCalcColumns: TableColumn[] = [
+  { name: "세율(%)", type: "퍼센트", note: "추가 팝업과 동일 로직" },
+  { name: "소득세", type: "금액", note: "자동 계산" },
+  { name: "지방소득세", type: "금액", note: "자동 계산" },
+  { name: "실지급액", type: "금액", note: "자동 계산" },
+];
+
+export const spsGroupEditPolicy: PolicyModule = {
+  id: "sps-group-edit",
+  moduleName: "사업소득 그룹 수정 팝업",
+  features: "예외 업종 합산 그룹 탭 기반 수정 / 모든 필드 수정 가능 / 탭별 삭제 / 일괄 검증·저장",
+  screens: [
+    {
+      screenId: "SPS_BI_08",
+      screenName: "그룹 수정 팝업",
+      description: "예외 업종 합산 행 클릭 시 노출. 탭 기반으로 여러 건 동시 편집. 모든 필드(귀속연월/성명/내외국인/주민번호/업종코드/지급액) 수정 가능.",
+    },
+  ],
+  listScreen: {
+    screenId: "SPS_BI_08",
+    search: { target: "", placeholder: "", specialCharAllowed: false },
+    sort: "",
+    pageSizeOptions: [],
+    defaultPageSize: 0,
+    excelFileName: "",
+    rowClickAction: "",
+  },
+  addPopup: {
+    screenId: "SPS_BI_08",
+    confirmMessage: "",
+    toastMessage: "",
+  },
+  editPopup: {
+    screenId: "SPS_BI_08",
+    confirmMessage: "사업소득 그룹 수정을 취소하시겠습니까?",
+    toastMessage: "사업소득 그룹 수정을 완료했습니다.",
+  },
+  fields: spsGroupEditFields,
+  tableColumns: spsGroupEditCalcColumns,
+  deletePolicy: {
+    type: "물리삭제",
+    description: [
+      "탭별 개별 삭제 (\"이 건 삭제\")",
+      "마지막 건 삭제 시 팝업 자동 닫힘",
+      "항상 삭제 가능",
+    ],
+    warning: "YYYY년 M월 지급 건을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.",
+  },
+  extraPolicies: [
+    {
+      title: "탭 구조",
+      description: "각 탭은 합산 그룹 내 개별 레코드. 탭 라벨: \"YYYY.MM 지급\". 지급연월 오름차순 정렬. 에러 있는 탭에 \"!\" 표시.",
+    },
+    {
+      title: "세율 결정 로직",
+      description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택. 내외국인 변경 시 세율 조건부 전환 트리거.",
+    },
+    {
+      title: "소액부징수",
+      description: "소득세가 1,000원 미만이면 소득세=0원, 지방소득세=0원.",
+    },
+    {
+      title: "일괄 검증·저장",
+      description: "\"수정\" 버튼 클릭 시 모든 탭 일괄 검증. 검증 실패 시 첫 번째 에러 탭으로 자동 전환. 모든 탭 통과 시 일괄 저장.",
+    },
+    {
+      title: "중복 검사",
+      description: "각 탭별로 자기 자신 제외하고 지급연월 + 귀속연월 + 주민번호 + 업종코드 중복 검사.",
+    },
+    {
+      title: "그룹 분리",
+      description: "귀속연월/업종코드/주민번호 수정 시 그룹핑 키 변경으로 기존 그룹에서 자연 분리. 별도 안내 없이 저장 후 리스트 갱신 시 반영.",
+    },
+    {
+      title: "귀속 기준 예외 확인",
+      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도인 탭이 있으면 confirm: \"예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다.\"",
+    },
+    {
+      title: "에러 시 수정 버튼 비활성화",
+      description: "어느 탭이든 유효성 에러가 존재하면 수정 버튼 비활성화. 모든 탭의 에러 해소 시 활성화.",
+    },
+  ],
+  detailedContent: groupEditContent,
+};
+
+// ─── 전체 정책 목록 ─────────────────────────────────────
+
+export const allPolicies: PolicyModule[] = [
+  spsSummaryPolicy,
+  spsMonthlyPolicy,
+  spsAddPolicy,
+  spsEditPolicy,
+  spsGroupEditPolicy,
+  spsExcelPolicy,
+  spsAllListPolicy,
+  spsAllAddPolicy,
+  spsAllEditPolicy,
+];

@@ -49,6 +49,7 @@ export interface PolicyModule {
   tableColumns: TableColumn[];
   deletePolicy: DeletePolicy;
   extraPolicies?: ExtraPolicy[];
+  detailedContent?: PolicyDetailedContent;
 }
 
 export interface ListScreenPolicy {
@@ -79,18 +80,14 @@ export interface DeletePolicy {
   warning?: string;
 }
 
+export interface PolicyDetailedContent {
+  overview: string;
+  features: string;
+}
+
 export interface ExtraPolicy {
   title: string;
   description: string;
-}
-
-export interface CompareItem {
-  category: string;
-  attribute: string;
-  moduleA: string;
-  moduleB: string;
-  tag: PolicyTag;
-  isDifferent: boolean;
 }
 
 export type TestCaseStatus = "pass" | "fail" | "pending";

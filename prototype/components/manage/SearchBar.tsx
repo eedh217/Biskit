@@ -15,7 +15,7 @@ export default function SearchBar({ placeholder, onSearch, maxLength, allowSpeci
   const handleChange = (v: string) => {
     if (maxLength && v.length > maxLength) return;
     if (!allowSpecialChar) {
-      v = v.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s]/g, "");
+      v = v.replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s&'\-\.·()]/g, "");
     }
     setValue(v);
   };
