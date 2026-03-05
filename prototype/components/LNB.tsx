@@ -37,16 +37,6 @@ function getMenuItems(depth1: string): MenuItem2depth[] {
           ],
         },
       ];
-    case "testcases":
-      return [
-        {
-          label: "사업소득",
-          children: [
-            { label: "월별 사업소득", href: "/testcases/sps/monthly" },
-            { label: "전체 사업소득", href: "/testcases/sps/all" },
-          ],
-        },
-      ];
     default:
       return [];
   }
@@ -55,11 +45,10 @@ function getMenuItems(depth1: string): MenuItem2depth[] {
 function getDepth1FromPathname(pathname: string): string | null {
   if (pathname.startsWith("/policy")) return "policy";
   if (pathname.startsWith("/sps")) return "sps";
-  if (pathname.startsWith("/testcases")) return "testcases";
   return null;
 }
 
-export default function LNB() {
+export default function LNB({ isOpen = true }: { isOpen?: boolean }) {
   const pathname = usePathname();
   const depth1 = getDepth1FromPathname(pathname);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
@@ -75,8 +64,12 @@ export default function LNB() {
   };
 
   return (
-    <aside className="w-[220px] shrink-0 bg-gray-50 border-r border-gray-200 min-h-[calc(100vh-56px)]">
-      <nav className="py-4">
+    <aside
+      className={`shrink-0 bg-gray-50 border-r border-gray-200 min-h-[calc(100vh-56px)] transition-all duration-300 overflow-hidden ${
+        isOpen ? "w-[220px]" : "w-0 border-r-0"
+      }`}
+    >
+      <nav className="py-4 w-[220px]">
         {menuItems.map((item2) => (
           <div key={item2.label}>
             {/* 2depth item */}

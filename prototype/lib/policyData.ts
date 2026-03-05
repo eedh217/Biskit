@@ -83,6 +83,7 @@ export const spsSummaryPolicy: PolicyModule = {
     },
   ],
   detailedContent: summaryContent,
+  sourceFile: "policy_사업소득합산_merged.md",
 };
 
 // ─── 사업소득 월별 리스트 (SPS_BI_02) ─────────────────────────────
@@ -174,6 +175,7 @@ export const spsMonthlyPolicy: PolicyModule = {
     },
   ],
   detailedContent: monthlyContent,
+  sourceFile: "policy_사업소득월별리스트_merged.md",
 };
 
 // ─── 사업소득 추가 팝업 (SPS_BI_03) ─────────────────────────────
@@ -304,6 +306,7 @@ export const spsAddPolicy: PolicyModule = {
     },
   ],
   detailedContent: addContent,
+  sourceFile: "policy_사업소득추가팝업_merged.md",
 };
 
 // ─── 사업소득 수정 팝업 (SPS_BI_04) ─────────────────────────────
@@ -439,6 +442,7 @@ export const spsEditPolicy: PolicyModule = {
     },
   ],
   detailedContent: editContent,
+  sourceFile: "policy_사업소득수정팝업_merged.md",
 };
 
 // ─── 사업소득 엑셀 업로드 ─────────────────────────────
@@ -509,6 +513,7 @@ export const spsExcelPolicy: PolicyModule = {
     },
   ],
   detailedContent: excelContent,
+  sourceFile: "policy_사업소득엑셀업로드_merged.md",
 };
 
 // ─── 전체 사업소득 (SPS_BI_05) ─────────────────────────────
@@ -602,6 +607,7 @@ export const spsAllListPolicy: PolicyModule = {
     },
   ],
   detailedContent: allListContent,
+  sourceFile: "policy_전체사업소득_merged.md",
 };
 
 // ─── 전체 사업소득 추가 팝업 (SPS_BI_06) ─────────────────────────────
@@ -754,6 +760,7 @@ export const spsAllAddPolicy: PolicyModule = {
     },
   ],
   detailedContent: allAddContent,
+  sourceFile: "policy_전체사업소득추가팝업_merged.md",
 };
 
 // ─── 전체 사업소득 수정 팝업 (SPS_BI_07) ─────────────────────────────
@@ -898,6 +905,7 @@ export const spsAllEditPolicy: PolicyModule = {
     },
   ],
   detailedContent: allEditContent,
+  sourceFile: "policy_전체사업소득수정팝업_merged.md",
 };
 
 // ─── 사업소득 그룹 수정 팝업 (SPS_BI_08) ─────────────────────────────
@@ -1046,6 +1054,7 @@ export const spsGroupEditPolicy: PolicyModule = {
     },
   ],
   detailedContent: groupEditContent,
+  sourceFile: "policy_사업소득그룹수정팝업_merged.md",
 };
 
 // ─── 전체 정책 목록 ─────────────────────────────────────

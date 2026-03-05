@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "정책분석", href: "/policy/sps/monthly", prefix: "/policy" },
   { label: "화면", href: "/sps/summary", prefix: "/sps" },
-  { label: "테스트케이스", href: "/testcases/sps/monthly", prefix: "/testcases" },
 ];
 
 export default function Navigation() {

@@ -261,17 +261,15 @@ function MonthlyContent() {
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => router.push("/sps/summary")}
-            className="text-gray-500 hover:text-gray-700"
-          >
-            &larr;
-          </button>
+        <button
+          onClick={() => router.push("/sps/summary")}
+          className="flex items-center gap-3 text-gray-500 hover:text-gray-700"
+        >
+          <span>&larr;</span>
           <h1 className="text-2xl font-bold text-gray-900">
             {year}년 {month}월 사업소득
           </h1>
-        </div>
+        </button>
         <button
           onClick={() => setShowAddPopup(true)}
           className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"

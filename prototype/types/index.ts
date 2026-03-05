@@ -50,6 +50,7 @@ export interface PolicyModule {
   deletePolicy: DeletePolicy;
   extraPolicies?: ExtraPolicy[];
   detailedContent?: PolicyDetailedContent;
+  sourceFile?: string;
 }
 
 export interface ListScreenPolicy {
