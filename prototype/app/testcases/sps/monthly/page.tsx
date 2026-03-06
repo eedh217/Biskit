@@ -6,7 +6,6 @@ import {
   spsMonthlyPolicy,
   spsAddPolicy,
   spsEditPolicy,
-  spsGroupEditPolicy,
   spsExcelPolicy,
 } from "@/lib/policyData";
 import {
@@ -21,7 +20,6 @@ const tabs = [
   { id: "sps-monthly", label: "사업소득 월별 리스트", policy: spsMonthlyPolicy },
   { id: "sps-add", label: "사업소득 추가 팝업", policy: spsAddPolicy },
   { id: "sps-edit", label: "사업소득 수정 팝업", policy: spsEditPolicy },
-  { id: "sps-group-edit", label: "사업소득 그룹 수정 팝업", policy: spsGroupEditPolicy },
   { id: "sps-excel", label: "사업소득 엑셀 업로드", policy: spsExcelPolicy },
 ];
 

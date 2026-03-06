@@ -3,7 +3,6 @@ import * as summaryContent from "./policyContent/sps-summary";
 import * as monthlyContent from "./policyContent/sps-monthly";
 import * as addContent from "./policyContent/sps-add";
 import * as editContent from "./policyContent/sps-edit";
-import * as groupEditContent from "./policyContent/sps-group-edit";
 import * as excelContent from "./policyContent/sps-excel";
 import * as allListContent from "./policyContent/sps-all-list";
 import * as allAddContent from "./policyContent/sps-all-add";
@@ -430,15 +429,31 @@ export const spsEditPolicy: PolicyModule = {
     },
     {
       title: "삭제 동작",
-      description: "삭제 완료 시 토스트 노출 후 SPS_BI_02 리스트 초기 상태로 복귀.",
+      description: "단건: 삭제 완료 시 토스트 노출 후 SPS_BI_02 리스트 초기 상태로 복귀. 다건: 탭별 \"이 건 삭제\" 가능, 삭제 즉시 SPS_BI_02 리스트/요약 갱신(팝업 유지), 마지막 건 삭제 시 팝업 자동 닫힘.",
     },
     {
       title: "중복 검사",
-      description: "submit 시 자기 자신을 제외하고 귀속연월 + 주민번호 + 업종코드 중복 검사.",
+      description: "submit 시 자기 자신을 제외하고 귀속연월 + 주민번호 + 업종코드 중복 검사. 다건 시 각 탭별 독립 검사.",
     },
     {
       title: "귀속 기준 예외 확인",
-      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도 시 confirm: \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\"",
+      description: "단건: 예외 업종 + 귀속연도≠지급연도 시 confirm \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\" / 다건: \"예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다.\"",
+    },
+    {
+      title: "탭 구조 (다건 모드)",
+      description: "합산 행 클릭 시 탭 기반 편집. 탭 라벨: \"YYYY.MM 지급\". 지급연월 오름차순 정렬. 에러 있는 탭에 \"!\" 표시. 단건 진입 시 탭 숨김.",
+    },
+    {
+      title: "일괄 검증·저장",
+      description: "\"수정\" 버튼 클릭 시 모든 탭 일괄 검증. 검증 실패 시 첫 번째 에러 탭으로 자동 전환. 모든 탭 통과 시 일괄 저장.",
+    },
+    {
+      title: "그룹 분리",
+      description: "귀속연월/업종코드/주민번호 수정 시 그룹핑 키 변경으로 기존 그룹에서 자연 분리. 별도 안내 없이 저장 후 리스트 갱신 시 반영.",
+    },
+    {
+      title: "단건/다건 동적 전환",
+      description: "다건에서 탭 삭제로 1건 남으면 자동으로 단건 모드 전환 (탭 UI 사라짐, 삭제 버튼 텍스트 변경).",
     },
   ],
   detailedContent: editContent,
@@ -908,155 +923,6 @@ export const spsAllEditPolicy: PolicyModule = {
   sourceFile: "policy_전체사업소득수정팝업_merged.md",
 };
 
-// ─── 사업소득 그룹 수정 팝업 (SPS_BI_08) ─────────────────────────────
-
-const spsGroupEditFields: PolicyField[] = [
-  {
-    name: "귀속연도",
-    required: true,
-    type: "select",
-    description: "수정 가능. 2025년 ~ 현재연도.",
-  },
-  {
-    name: "귀속월",
-    required: true,
-    type: "select",
-    description: "수정 가능. 1월~12월.",
-  },
-  {
-    name: "성명(상호)",
-    required: true,
-    type: "text",
-    maxLength: 50,
-    description: "수정 가능. 허용 문자: 한글·영문·숫자·공백·허용 특수문자.",
-    validation: ["허용 문자: 한글·영문·숫자·공백·&·'·-·.·(가운뎃점)", "공백만 입력 시 필수 에러"],
-    errorMessages: { required: "필수 입력 항목입니다." },
-  },
-  {
-    name: "내외국인 구분",
-    required: true,
-    type: "radio",
-    options: ["내국인", "외국인"],
-    description: "수정 가능. 변경 시 세율 조건부 전환 트리거.",
-  },
-  {
-    name: "주민(사업자)등록번호",
-    required: true,
-    type: "text",
-    maxLength: 13,
-    description: "수정 가능. 마스킹 없이 전체 표시.",
-    validation: [
-      "숫자만 입력 가능",
-      "10자리 또는 13자리만 허용",
-      "체크디짓 알고리즘 검증",
-      "병의원(851101) 선택 시 10자리 이하만 허용",
-    ],
-    errorMessages: {
-      length: "주민(사업자)등록번호는 10자리 또는 13자리만 입력 가능합니다.",
-      checkDigit: "유효하지 않은 주민(사업자)등록번호입니다.",
-      hospital: "병의원인 경우, 사업자등록번호만 입력하실 수 있습니다.",
-    },
-  },
-  {
-    name: "업종코드",
-    required: true,
-    type: "select",
-    description: "수정 가능.",
-  },
-  {
-    name: "지급액",
-    required: true,
-    type: "number",
-    description: "수정 가능. 0 이상 정수, 최대 12자리.",
-  },
-];
-
-const spsGroupEditCalcColumns: TableColumn[] = [
-  { name: "세율(%)", type: "퍼센트", note: "추가 팝업과 동일 로직" },
-  { name: "소득세", type: "금액", note: "자동 계산" },
-  { name: "지방소득세", type: "금액", note: "자동 계산" },
-  { name: "실지급액", type: "금액", note: "자동 계산" },
-];
-
-export const spsGroupEditPolicy: PolicyModule = {
-  id: "sps-group-edit",
-  moduleName: "사업소득 그룹 수정 팝업",
-  features: "예외 업종 합산 그룹 탭 기반 수정 / 모든 필드 수정 가능 / 탭별 삭제 / 일괄 검증·저장",
-  screens: [
-    {
-      screenId: "SPS_BI_08",
-      screenName: "그룹 수정 팝업",
-      description: "예외 업종 합산 행 클릭 시 노출. 탭 기반으로 여러 건 동시 편집. 모든 필드(귀속연월/성명/내외국인/주민번호/업종코드/지급액) 수정 가능.",
-    },
-  ],
-  listScreen: {
-    screenId: "SPS_BI_08",
-    search: { target: "", placeholder: "", specialCharAllowed: false },
-    sort: "",
-    pageSizeOptions: [],
-    defaultPageSize: 0,
-    excelFileName: "",
-    rowClickAction: "",
-  },
-  addPopup: {
-    screenId: "SPS_BI_08",
-    confirmMessage: "",
-    toastMessage: "",
-  },
-  editPopup: {
-    screenId: "SPS_BI_08",
-    confirmMessage: "사업소득 그룹 수정을 취소하시겠습니까?",
-    toastMessage: "사업소득 그룹 수정을 완료했습니다.",
-  },
-  fields: spsGroupEditFields,
-  tableColumns: spsGroupEditCalcColumns,
-  deletePolicy: {
-    type: "물리삭제",
-    description: [
-      "탭별 개별 삭제 (\"이 건 삭제\")",
-      "마지막 건 삭제 시 팝업 자동 닫힘",
-      "항상 삭제 가능",
-    ],
-    warning: "YYYY년 M월 지급 건을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.",
-  },
-  extraPolicies: [
-    {
-      title: "탭 구조",
-      description: "각 탭은 합산 그룹 내 개별 레코드. 탭 라벨: \"YYYY.MM 지급\". 지급연월 오름차순 정렬. 에러 있는 탭에 \"!\" 표시.",
-    },
-    {
-      title: "세율 결정 로직",
-      description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택. 내외국인 변경 시 세율 조건부 전환 트리거.",
-    },
-    {
-      title: "소액부징수",
-      description: "소득세가 1,000원 미만이면 소득세=0원, 지방소득세=0원.",
-    },
-    {
-      title: "일괄 검증·저장",
-      description: "\"수정\" 버튼 클릭 시 모든 탭 일괄 검증. 검증 실패 시 첫 번째 에러 탭으로 자동 전환. 모든 탭 통과 시 일괄 저장.",
-    },
-    {
-      title: "중복 검사",
-      description: "각 탭별로 자기 자신 제외하고 지급연월 + 귀속연월 + 주민번호 + 업종코드 중복 검사.",
-    },
-    {
-      title: "그룹 분리",
-      description: "귀속연월/업종코드/주민번호 수정 시 그룹핑 키 변경으로 기존 그룹에서 자연 분리. 별도 안내 없이 저장 후 리스트 갱신 시 반영.",
-    },
-    {
-      title: "귀속 기준 예외 확인",
-      description: "예외 업종(940906/940907/940908) + 귀속연도≠지급연도인 탭이 있으면 confirm: \"예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다.\"",
-    },
-    {
-      title: "에러 시 수정 버튼 비활성화",
-      description: "어느 탭이든 유효성 에러가 존재하면 수정 버튼 비활성화. 모든 탭의 에러 해소 시 활성화.",
-    },
-  ],
-  detailedContent: groupEditContent,
-  sourceFile: "policy_사업소득그룹수정팝업_merged.md",
-};
-
 // ─── 전체 정책 목록 ─────────────────────────────────────
 
 export const allPolicies: PolicyModule[] = [
@@ -1064,7 +930,6 @@ export const allPolicies: PolicyModule[] = [
   spsMonthlyPolicy,
   spsAddPolicy,
   spsEditPolicy,
-  spsGroupEditPolicy,
   spsExcelPolicy,
   spsAllListPolicy,
   spsAllAddPolicy,

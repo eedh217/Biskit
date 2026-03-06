@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { BusinessIncome } from "@/types/sps";
-import { INDUSTRY_CODES, isExceptionIndustry, HOSPITAL_CODE, GRATUITY_CODE, ATHLETE_CODE } from "@/lib/industryCodes";
+import { INDUSTRY_CODES, isExceptionIndustry, GRATUITY_CODE } from "@/lib/industryCodes";
 import { determineTaxRate, calculateTax, needsTaxRateSelection } from "@/lib/taxCalculation";
 import {
   validateIdNumberLength,
@@ -13,67 +13,106 @@ import {
 import { updateBusinessIncome, deleteBusinessIncomes, getBusinessIncomes } from "@/lib/store";
 import { formatAmount, parseAmountInput, displayAmountInput } from "@/lib/formatUtils";
 import ConfirmDialog from "@/components/manage/ConfirmDialog";
+import Toast from "@/components/manage/Toast";
 
 interface Props {
-  data: BusinessIncome;
+  records: BusinessIncome[];
   onClose: () => void;
   onSaved: () => void;
   onDeleted: () => void;
+  onRefresh?: () => void;
 }
 
-const NAME_ALLOWED_PATTERN = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s&'\-\.·()]*$/;
-
-export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDeleted }: Props) {
-  const [attrYear, setAttrYear] = useState<string>(String(data.attributionYear));
-  const [attrMonth, setAttrMonth] = useState<string>(String(data.attributionMonth));
-  const [name, setName] = useState(data.name);
-  const [isForeign, setIsForeign] = useState<"N" | "Y">(data.isForeign);
-  const [idNumber, setIdNumber] = useState(data.idNumber);
-  const [industryCode, setIndustryCode] = useState(data.industryCode);
-  const [paymentAmountRaw, setPaymentAmountRaw] = useState(String(data.paymentAmount));
-  const [selectedTaxRate, setSelectedTaxRate] = useState<number>(
-    data.taxRate === 0.20 ? 20 : data.taxRate === 0.05 ? 5 : 3
-  );
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [taxResult, setTaxResult] = useState<{
+interface TabFormState {
+  id: string;
+  paymentYear: number;
+  paymentMonth: number;
+  attrYear: string;
+  attrMonth: string;
+  name: string;
+  isForeign: "N" | "Y";
+  idNumber: string;
+  industryCode: string;
+  paymentAmountRaw: string;
+  selectedTaxRate: number;
+  taxResult: {
     taxRate: number;
     incomeTax: number;
     localTax: number;
     netPayment: number;
-  }>({
-    taxRate: data.taxRate,
-    incomeTax: data.incomeTax,
-    localTax: data.localTax,
-    netPayment: data.netPayment,
-  });
+  };
+  errors: Record<string, string>;
+}
+
+const NAME_ALLOWED_PATTERN = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s&'\-\.·()]*$/;
+
+function createTabState(record: BusinessIncome): TabFormState {
+  return {
+    id: record.id,
+    paymentYear: record.paymentYear,
+    paymentMonth: record.paymentMonth,
+    attrYear: String(record.attributionYear),
+    attrMonth: String(record.attributionMonth),
+    name: record.name,
+    isForeign: record.isForeign,
+    idNumber: record.idNumber,
+    industryCode: record.industryCode,
+    paymentAmountRaw: String(record.paymentAmount),
+    selectedTaxRate: record.taxRate === 0.20 ? 20 : record.taxRate === 0.05 ? 5 : 3,
+    taxResult: {
+      taxRate: record.taxRate,
+      incomeTax: record.incomeTax,
+      localTax: record.localTax,
+      netPayment: record.netPayment,
+    },
+    errors: {},
+  };
+}
+
+export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onDeleted, onRefresh }: Props) {
+  const [tabs, setTabs] = useState<TabFormState[]>(() =>
+    records
+      .sort((a, b) => a.paymentYear * 100 + a.paymentMonth - (b.paymentYear * 100 + b.paymentMonth))
+      .map(createTabState)
+  );
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
 
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExceptionConfirm, setShowExceptionConfirm] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const initialRef = useRef({
-    attrYear: String(data.attributionYear),
-    attrMonth: String(data.attributionMonth),
-    name: data.name,
-    isForeign: data.isForeign,
-    idNumber: data.idNumber,
-    industryCode: data.industryCode,
-    paymentAmountRaw: String(data.paymentAmount),
-  });
+  const initialRef = useRef(
+    records.map((r) => ({
+      id: r.id,
+      attrYear: String(r.attributionYear),
+      attrMonth: String(r.attributionMonth),
+      name: r.name,
+      isForeign: r.isForeign,
+      idNumber: r.idNumber,
+      industryCode: r.industryCode,
+      paymentAmountRaw: String(r.paymentAmount),
+    }))
+  );
+
+  // Dynamic single/multi mode
+  const isMulti = tabs.length > 1;
 
   const isDirty = useCallback(() => {
-    const init = initialRef.current;
-    return (
-      attrYear !== init.attrYear ||
-      attrMonth !== init.attrMonth ||
-      name !== init.name ||
-      isForeign !== init.isForeign ||
-      idNumber !== init.idNumber ||
-      industryCode !== init.industryCode ||
-      paymentAmountRaw !== init.paymentAmountRaw
-    );
-  }, [attrYear, attrMonth, name, isForeign, idNumber, industryCode, paymentAmountRaw]);
+    return tabs.some((tab) => {
+      const init = initialRef.current.find((i) => i.id === tab.id);
+      if (!init) return true;
+      return (
+        tab.attrYear !== init.attrYear ||
+        tab.attrMonth !== init.attrMonth ||
+        tab.name !== init.name ||
+        tab.isForeign !== init.isForeign ||
+        tab.idNumber !== init.idNumber ||
+        tab.industryCode !== init.industryCode ||
+        tab.paymentAmountRaw !== init.paymentAmountRaw
+      );
+    });
+  }, [tabs]);
 
   const handleClose = () => {
     if (isDirty()) {
@@ -83,67 +122,109 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
     }
   };
 
-  const setError = (field: string, message: string | null) => {
-    setErrors((prev) => {
-      const next = { ...prev };
-      if (message) next[field] = message;
-      else delete next[field];
-      return next;
-    });
+  const updateTab = (index: number, updates: Partial<TabFormState>) => {
+    setTabs((prev) => prev.map((t, i) => (i === index ? { ...t, ...updates } : t)));
+  };
+
+  const setTabError = (index: number, field: string, message: string | null) => {
+    setTabs((prev) =>
+      prev.map((t, i) => {
+        if (i !== index) return t;
+        const next = { ...t.errors };
+        if (message) next[field] = message;
+        else delete next[field];
+        return { ...t, errors: next };
+      })
+    );
+  };
+
+  const recalcTab = (index: number, code?: string, foreign?: "N" | "Y", amtRaw?: string, rate?: number) => {
+    const tab = tabs[index];
+    const ic = code ?? tab.industryCode;
+    const fg = foreign ?? tab.isForeign;
+    const raw = amtRaw ?? tab.paymentAmountRaw;
+    const r = rate ?? tab.selectedTaxRate;
+    if (ic && raw) {
+      const amount = parseInt(raw, 10);
+      if (!isNaN(amount) && amount >= 0) {
+        const taxRate = determineTaxRate(ic, fg, r);
+        const result = calculateTax(amount, taxRate);
+        updateTab(index, { taxResult: result });
+      }
+    }
+  };
+
+  // Handlers for active tab
+  const handleAttrYearChange = (value: string) => {
+    updateTab(activeTabIndex, { attrYear: value });
+    setTabError(activeTabIndex, "attrYear", null);
+  };
+
+  const handleAttrMonthChange = (value: string) => {
+    updateTab(activeTabIndex, { attrMonth: value });
+    setTabError(activeTabIndex, "attrMonth", null);
   };
 
   const handleAttrYearBlur = () => {
-    if (!attrYear) {
-      setError("attrYear", "필수 입력 항목입니다.");
+    const tab = tabs[activeTabIndex];
+    if (!tab.attrYear) {
+      setTabError(activeTabIndex, "attrYear", "필수 입력 항목입니다.");
     } else {
-      setError("attrYear", null);
+      setTabError(activeTabIndex, "attrYear", null);
     }
-    validateAttrDate(attrYear, attrMonth);
-    tryRecalc();
+    validateAttrDate(activeTabIndex);
   };
 
   const handleAttrMonthBlur = () => {
-    if (!attrMonth) {
-      setError("attrMonth", "필수 입력 항목입니다.");
+    const tab = tabs[activeTabIndex];
+    if (!tab.attrMonth) {
+      setTabError(activeTabIndex, "attrMonth", "필수 입력 항목입니다.");
     } else {
-      setError("attrMonth", null);
+      setTabError(activeTabIndex, "attrMonth", null);
     }
-    validateAttrDate(attrYear, attrMonth);
-    tryRecalc();
+    validateAttrDate(activeTabIndex);
   };
 
-  const validateAttrDate = (y: string, m: string) => {
-    if (y && m) {
-      const err = validateAttributionDate(Number(y), Number(m), data.paymentYear, data.paymentMonth);
-      setError("attrDate", err);
+  const validateAttrDate = (index: number) => {
+    const tab = tabs[index];
+    if (tab.attrYear && tab.attrMonth) {
+      const err = validateAttributionDate(
+        Number(tab.attrYear),
+        Number(tab.attrMonth),
+        tab.paymentYear,
+        tab.paymentMonth
+      );
+      setTabError(index, "attrDate", err);
     } else {
-      setError("attrDate", null);
+      setTabError(index, "attrDate", null);
     }
   };
 
   const handleNameChange = (v: string) => {
     if (v.length > 50) return;
     if (!NAME_ALLOWED_PATTERN.test(v)) return;
-    setName(v);
+    updateTab(activeTabIndex, { name: v });
   };
 
   const handleNameBlur = () => {
-    const trimmed = name.trim();
+    const tab = tabs[activeTabIndex];
+    const trimmed = tab.name.trim();
     if (!trimmed) {
-      setError("name", "필수 입력 항목입니다.");
+      setTabError(activeTabIndex, "name", "필수 입력 항목입니다.");
     } else {
-      setError("name", null);
+      setTabError(activeTabIndex, "name", null);
     }
   };
 
   const handleIsForeignChange = (val: "N" | "Y") => {
-    setIsForeign(val);
-    if (industryCode && paymentAmountRaw) {
-      const amount = parseInt(paymentAmountRaw, 10);
+    const tab = tabs[activeTabIndex];
+    updateTab(activeTabIndex, { isForeign: val });
+    if (tab.industryCode && tab.paymentAmountRaw) {
+      const amount = parseInt(tab.paymentAmountRaw, 10);
       if (!isNaN(amount)) {
-        const taxRate = determineTaxRate(industryCode, val, selectedTaxRate);
+        const taxRate = determineTaxRate(tab.industryCode, val, tab.selectedTaxRate);
         const result = calculateTax(amount, taxRate);
-        setTaxResult(result);
+        updateTab(activeTabIndex, { isForeign: val, taxResult: result });
       }
     }
   };
@@ -151,224 +232,278 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
   const handleIdNumberChange = (v: string) => {
     const cleaned = v.replace(/[^0-9]/g, "");
     if (cleaned.length > 13) return;
-    setIdNumber(cleaned);
+    updateTab(activeTabIndex, { idNumber: cleaned });
   };
 
   const handleIdNumberBlur = () => {
-    if (!idNumber) {
-      setError("idNumber", "필수 입력 항목입니다.");
+    const tab = tabs[activeTabIndex];
+    if (!tab.idNumber) {
+      setTabError(activeTabIndex, "idNumber", "필수 입력 항목입니다.");
       return;
     }
-    const lengthErr = validateIdNumberLength(idNumber);
+    const lengthErr = validateIdNumberLength(tab.idNumber);
     if (lengthErr) {
-      setError("idNumber", lengthErr);
+      setTabError(activeTabIndex, "idNumber", lengthErr);
       return;
     }
-    const checkErr = validateIdNumberCheckDigit(idNumber);
+    const checkErr = validateIdNumberCheckDigit(tab.idNumber);
     if (checkErr) {
-      setError("idNumber", checkErr);
+      setTabError(activeTabIndex, "idNumber", checkErr);
       return;
     }
-    if (industryCode) {
-      const hospErr = validateHospitalIdNumber(industryCode, idNumber);
+    if (tab.industryCode) {
+      const hospErr = validateHospitalIdNumber(tab.industryCode, tab.idNumber);
       if (hospErr) {
-        setError("idNumber", hospErr);
+        setTabError(activeTabIndex, "idNumber", hospErr);
         return;
       }
     }
-    setError("idNumber", null);
-    tryRecalc();
-  };
-
-  const handleIndustryCodeBlur = () => {
-    if (!industryCode) {
-      setError("industryCode", "필수 입력 항목입니다.");
-      return;
-    }
-    if (idNumber) {
-      const hospErr = validateHospitalIdNumber(industryCode, idNumber);
-      if (hospErr) {
-        setError("industryCode", hospErr);
-        return;
-      }
-    }
-    setError("industryCode", null);
-    tryRecalc();
-  };
-
-  const handlePaymentAmountBlur = () => {
-    if (!paymentAmountRaw) {
-      setError("paymentAmount", "필수 입력 항목입니다.");
-    } else {
-      setError("paymentAmount", null);
-    }
-    tryRecalc();
-  };
-
-  const tryRecalc = () => {
-    setTimeout(() => {
-      if (industryCode && paymentAmountRaw) {
-        const amount = parseInt(paymentAmountRaw, 10);
-        if (!isNaN(amount) && amount >= 0) {
-          const taxRate = determineTaxRate(industryCode, isForeign, selectedTaxRate);
-          const result = calculateTax(amount, taxRate);
-          setTaxResult(result);
-        }
-      }
-    }, 0);
+    setTabError(activeTabIndex, "idNumber", null);
+    recalcTab(activeTabIndex);
   };
 
   const handleIndustryCodeChange = (code: string) => {
-    setIndustryCode(code);
-    setError("industryCode", null);
-    if (code && paymentAmountRaw) {
-      const amount = parseInt(paymentAmountRaw, 10);
+    const tab = tabs[activeTabIndex];
+    updateTab(activeTabIndex, { industryCode: code });
+    setTabError(activeTabIndex, "industryCode", null);
+    if (code && tab.paymentAmountRaw) {
+      const amount = parseInt(tab.paymentAmountRaw, 10);
       if (!isNaN(amount)) {
-        const taxRate = determineTaxRate(code, isForeign, selectedTaxRate);
+        const taxRate = determineTaxRate(code, tab.isForeign, tab.selectedTaxRate);
         const result = calculateTax(amount, taxRate);
-        setTaxResult(result);
+        updateTab(activeTabIndex, { industryCode: code, taxResult: result });
       }
     }
-    if (idNumber && code) {
-      const hospErr = validateHospitalIdNumber(code, idNumber);
+    if (tab.idNumber && code) {
+      const hospErr = validateHospitalIdNumber(code, tab.idNumber);
       if (hospErr) {
-        setError("industryCode", hospErr);
+        setTabError(activeTabIndex, "industryCode", hospErr);
       }
     }
   };
 
-  const handleTaxRateChange = (rate: number) => {
-    setSelectedTaxRate(rate);
-    if (industryCode && paymentAmountRaw) {
-      const amount = parseInt(paymentAmountRaw, 10);
-      if (!isNaN(amount)) {
-        const taxRate = determineTaxRate(industryCode, isForeign, rate);
-        const result = calculateTax(amount, taxRate);
-        setTaxResult(result);
+  const handleIndustryCodeBlur = () => {
+    const tab = tabs[activeTabIndex];
+    if (!tab.industryCode) {
+      setTabError(activeTabIndex, "industryCode", "필수 입력 항목입니다.");
+      return;
+    }
+    if (tab.idNumber) {
+      const hospErr = validateHospitalIdNumber(tab.industryCode, tab.idNumber);
+      if (hospErr) {
+        setTabError(activeTabIndex, "industryCode", hospErr);
+        return;
       }
     }
+    setTabError(activeTabIndex, "industryCode", null);
+    recalcTab(activeTabIndex);
   };
 
   const handlePaymentAmountChange = (v: string) => {
     const parsed = parseAmountInput(v);
     if (parsed.length > 12) return;
-    setPaymentAmountRaw(parsed);
+    updateTab(activeTabIndex, { paymentAmountRaw: parsed });
   };
 
-  const handleSubmit = () => {
-    const newErrors: Record<string, string> = {};
+  const handlePaymentAmountBlur = () => {
+    const tab = tabs[activeTabIndex];
+    if (!tab.paymentAmountRaw) {
+      setTabError(activeTabIndex, "paymentAmount", "필수 입력 항목입니다.");
+    } else {
+      setTabError(activeTabIndex, "paymentAmount", null);
+    }
+    recalcTab(activeTabIndex);
+  };
 
-    if (!attrYear) newErrors.attrYear = "필수 입력 항목입니다.";
-    if (!attrMonth) newErrors.attrMonth = "필수 입력 항목입니다.";
-    if (!name.trim()) newErrors.name = "필수 입력 항목입니다.";
-    if (!idNumber) newErrors.idNumber = "필수 입력 항목입니다.";
-    if (!industryCode) newErrors.industryCode = "필수 입력 항목입니다.";
-    if (!paymentAmountRaw) newErrors.paymentAmount = "필수 입력 항목입니다.";
-
-    if (idNumber) {
-      const lenErr = validateIdNumberLength(idNumber);
-      if (lenErr) newErrors.idNumber = lenErr;
-      else {
-        const chkErr = validateIdNumberCheckDigit(idNumber);
-        if (chkErr) newErrors.idNumber = chkErr;
+  const handleTaxRateChange = (rate: number) => {
+    const tab = tabs[activeTabIndex];
+    updateTab(activeTabIndex, { selectedTaxRate: rate });
+    if (tab.industryCode && tab.paymentAmountRaw) {
+      const amount = parseInt(tab.paymentAmountRaw, 10);
+      if (!isNaN(amount)) {
+        const taxRate = determineTaxRate(tab.industryCode, tab.isForeign, rate);
+        const result = calculateTax(amount, taxRate);
+        updateTab(activeTabIndex, { selectedTaxRate: rate, taxResult: result });
       }
     }
-
-    if (industryCode && idNumber) {
-      const hospErr = validateHospitalIdNumber(industryCode, idNumber);
-      if (hospErr) newErrors.industryCode = hospErr;
-    }
-
-    if (attrYear && attrMonth) {
-      const dateErr = validateAttributionDate(Number(attrYear), Number(attrMonth), data.paymentYear, data.paymentMonth);
-      if (dateErr) newErrors.attrDate = dateErr;
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-
-    // 중복 검사 (자기 자신 제외)
-    const all = getBusinessIncomes();
-    const dup = all.some(
-      (item) =>
-        item.id !== data.id &&
-        item.paymentYear === data.paymentYear &&
-        item.paymentMonth === data.paymentMonth &&
-        item.attributionYear === Number(attrYear) &&
-        item.attributionMonth === Number(attrMonth) &&
-        item.idNumber === idNumber &&
-        item.industryCode === industryCode
-    );
-    if (dup) {
-      alert("지급연월, 귀속연월, 주민(사업자)등록번호, 업종코드가 동일한 사업소득이 존재합니다.");
-      return;
-    }
-
-    // 예외 업종 확인
-    if (
-      isExceptionIndustry(industryCode) &&
-      Number(attrYear) !== data.paymentYear
-    ) {
-      setShowExceptionConfirm(true);
-      return;
-    }
-
-    doSave();
   };
 
-  const doSave = () => {
-    const amount = parseInt(paymentAmountRaw, 10);
-    const taxRate = determineTaxRate(industryCode, isForeign, selectedTaxRate);
-    const tax = calculateTax(amount, taxRate);
-
-    const result = updateBusinessIncome(data.id, {
-      attributionYear: Number(attrYear),
-      attributionMonth: Number(attrMonth),
-      name: name.trim(),
-      isForeign,
-      idNumber,
-      industryCode,
-      paymentAmount: amount,
-      taxRate: tax.taxRate,
-      incomeTax: tax.incomeTax,
-      localTax: tax.localTax,
-      netPayment: tax.netPayment,
-    });
-
-    if (!result.success) {
-      alert(result.error || "서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
-      return;
-    }
-
-    onSaved();
-  };
-
+  // Delete current tab's record
   const handleDelete = () => {
     setShowDeleteConfirm(true);
   };
 
   const confirmDelete = () => {
-    deleteBusinessIncomes([data.id]);
+    const deletedTab = tabs[activeTabIndex];
+    const deletedId = deletedTab.id;
+    const currentIndex = activeTabIndex;
+    const currentLength = tabs.length;
+
+    deleteBusinessIncomes([deletedId]);
     setShowDeleteConfirm(false);
-    onDeleted();
+
+    if (currentLength <= 1) {
+      // Last record deleted, close popup
+      onDeleted();
+      return;
+    }
+
+    // Remove from initialRef
+    initialRef.current = initialRef.current.filter((r) => r.id !== deletedId);
+    setTabs(prev => prev.filter(t => t.id !== deletedId));
+    setActiveTabIndex(Math.min(currentIndex, currentLength - 2));
+    setToast("사업소득 삭제를 완료했습니다.");
+    onRefresh?.();
   };
 
-  const showTaxRateRadio = needsTaxRateSelection(industryCode, isForeign);
-  const displayTaxRateText = industryCode
-    ? industryCode === GRATUITY_CODE
-      ? "5%"
-      : showTaxRateRadio
-      ? `${selectedTaxRate}%`
-      : "3%"
-    : "-";
+  // Validate all tabs
+  const validateAllTabs = (): number | null => {
+    let firstErrorTab: number | null = null;
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
+      const newErrors: Record<string, string> = {};
+
+      if (!tab.attrYear) newErrors.attrYear = "필수 입력 항목입니다.";
+      if (!tab.attrMonth) newErrors.attrMonth = "필수 입력 항목입니다.";
+      if (!tab.name.trim()) newErrors.name = "필수 입력 항목입니다.";
+      if (!tab.idNumber) newErrors.idNumber = "필수 입력 항목입니다.";
+      if (!tab.industryCode) newErrors.industryCode = "필수 입력 항목입니다.";
+      if (!tab.paymentAmountRaw) newErrors.paymentAmount = "필수 입력 항목입니다.";
+
+      if (tab.idNumber) {
+        const lenErr = validateIdNumberLength(tab.idNumber);
+        if (lenErr) newErrors.idNumber = lenErr;
+        else {
+          const chkErr = validateIdNumberCheckDigit(tab.idNumber);
+          if (chkErr) newErrors.idNumber = chkErr;
+        }
+      }
+
+      if (tab.industryCode && tab.idNumber) {
+        const hospErr = validateHospitalIdNumber(tab.industryCode, tab.idNumber);
+        if (hospErr) newErrors.industryCode = hospErr;
+      }
+
+      if (tab.attrYear && tab.attrMonth) {
+        const dateErr = validateAttributionDate(
+          Number(tab.attrYear),
+          Number(tab.attrMonth),
+          tab.paymentYear,
+          tab.paymentMonth
+        );
+        if (dateErr) newErrors.attrDate = dateErr;
+      }
+
+      // Duplicate check (excluding self)
+      const all = getBusinessIncomes();
+      const dup = all.some(
+        (item) =>
+          item.id !== tab.id &&
+          item.paymentYear === tab.paymentYear &&
+          item.paymentMonth === tab.paymentMonth &&
+          item.attributionYear === Number(tab.attrYear) &&
+          item.attributionMonth === Number(tab.attrMonth) &&
+          item.idNumber === tab.idNumber &&
+          item.industryCode === tab.industryCode
+      );
+      if (dup) {
+        newErrors.duplicate = "지급연월, 귀속연월, 주민(사업자)등록번호, 업종코드가 동일한 사업소득이 존재합니다.";
+      }
+
+      if (Object.keys(newErrors).length > 0) {
+        setTabs((prev) =>
+          prev.map((t, idx) => (idx === i ? { ...t, errors: newErrors } : t))
+        );
+        if (firstErrorTab === null) firstErrorTab = i;
+      } else {
+        setTabs((prev) =>
+          prev.map((t, idx) => (idx === i ? { ...t, errors: {} } : t))
+        );
+      }
+    }
+
+    return firstErrorTab;
+  };
+
+  const handleSubmit = () => {
+    const firstErrorTab = validateAllTabs();
+    if (firstErrorTab !== null) {
+      setActiveTabIndex(firstErrorTab);
+      return;
+    }
+
+    // Check exception industry
+    const hasException = tabs.some(
+      (tab) =>
+        isExceptionIndustry(tab.industryCode) &&
+        Number(tab.attrYear) !== tab.paymentYear
+    );
+
+    if (hasException) {
+      setShowExceptionConfirm(true);
+      return;
+    }
+
+    doSaveAll();
+  };
+
+  const doSaveAll = () => {
+    for (const tab of tabs) {
+      const amount = parseInt(tab.paymentAmountRaw, 10);
+      const taxRate = determineTaxRate(tab.industryCode, tab.isForeign, tab.selectedTaxRate);
+      const tax = calculateTax(amount, taxRate);
+
+      const result = updateBusinessIncome(tab.id, {
+        attributionYear: Number(tab.attrYear),
+        attributionMonth: Number(tab.attrMonth),
+        name: tab.name.trim(),
+        isForeign: tab.isForeign,
+        idNumber: tab.idNumber,
+        industryCode: tab.industryCode,
+        paymentAmount: amount,
+        taxRate: tax.taxRate,
+        incomeTax: tax.incomeTax,
+        localTax: tax.localTax,
+        netPayment: tax.netPayment,
+      });
+
+      if (!result.success) {
+        alert(result.error || "저장 중 오류가 발생했습니다.");
+        return;
+      }
+    }
+
+    onSaved();
+  };
 
   const currentYear = new Date().getFullYear();
   const yearOptions: number[] = [];
   for (let y = 2025; y <= currentYear; y++) yearOptions.push(y);
 
-  const hasErrors = Object.keys(errors).length > 0;
+  const tab = tabs[activeTabIndex];
+  if (!tab) return null;
+
+  const showTaxRateRadio = needsTaxRateSelection(tab.industryCode, tab.isForeign);
+  const displayTaxRate = tab.industryCode
+    ? tab.industryCode === GRATUITY_CODE
+      ? "5%"
+      : showTaxRateRadio
+      ? `${tab.selectedTaxRate}%`
+      : "3%"
+    : "-";
+
+  const hasAnyErrors = tabs.some((t) => Object.keys(t.errors).length > 0);
+
+  // Delete confirm message differs by mode
+  const deleteConfirmMessage = isMulti
+    ? `${tab.paymentYear}년 ${tab.paymentMonth}월 지급 건을 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`
+    : "사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.";
+
+  // Exception confirm message differs by mode
+  const exceptionConfirmMessage = isMulti
+    ? "예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다."
+    : `해당 데이터는 ${tab.attrYear}년 12월 사업소득에 표시됩니다.`;
 
   return (
     <>
@@ -382,6 +517,31 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
             </button>
           </div>
 
+          {/* Tabs - only shown in multi mode */}
+          {isMulti && (
+            <div className="flex border-b border-gray-200 px-6 pt-2 gap-1 overflow-x-auto">
+              {tabs.map((t, i) => {
+                const hasTabErrors = Object.keys(t.errors).length > 0;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTabIndex(i)}
+                    className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                      i === activeTabIndex
+                        ? "border-blue-600 text-blue-600"
+                        : hasTabErrors
+                        ? "border-transparent text-red-500 hover:text-red-700"
+                        : "border-transparent text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {t.paymentYear}.{String(t.paymentMonth).padStart(2, "0")} 지급
+                    {hasTabErrors && <span className="ml-1 text-red-500">!</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <div className="px-6 py-4 space-y-4">
             {/* 귀속연도/월 */}
             <div>
@@ -390,8 +550,8 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               </label>
               <div className="flex gap-2">
                 <select
-                  value={attrYear}
-                  onChange={(e) => { setAttrYear(e.target.value); setError("attrYear", null); }}
+                  value={tab.attrYear}
+                  onChange={(e) => handleAttrYearChange(e.target.value)}
                   onBlur={handleAttrYearBlur}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -401,8 +561,8 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                   ))}
                 </select>
                 <select
-                  value={attrMonth}
-                  onChange={(e) => { setAttrMonth(e.target.value); setError("attrMonth", null); }}
+                  value={tab.attrMonth}
+                  onChange={(e) => handleAttrMonthChange(e.target.value)}
                   onBlur={handleAttrMonthBlur}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -412,9 +572,9 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                   ))}
                 </select>
               </div>
-              {errors.attrYear && <p className="text-xs text-red-500 mt-1">{errors.attrYear}</p>}
-              {errors.attrMonth && <p className="text-xs text-red-500 mt-1">{errors.attrMonth}</p>}
-              {errors.attrDate && <p className="text-xs text-red-500 mt-1">{errors.attrDate}</p>}
+              {tab.errors.attrYear && <p className="text-xs text-red-500 mt-1">{tab.errors.attrYear}</p>}
+              {tab.errors.attrMonth && <p className="text-xs text-red-500 mt-1">{tab.errors.attrMonth}</p>}
+              {tab.errors.attrDate && <p className="text-xs text-red-500 mt-1">{tab.errors.attrDate}</p>}
             </div>
 
             {/* 성명(상호) */}
@@ -424,13 +584,13 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               </label>
               <input
                 type="text"
-                value={name}
+                value={tab.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 onBlur={handleNameBlur}
                 placeholder="성명 또는 상호 입력"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              {tab.errors.name && <p className="text-xs text-red-500 mt-1">{tab.errors.name}</p>}
             </div>
 
             {/* 내외국인 구분 */}
@@ -442,7 +602,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="radio"
-                    checked={isForeign === "N"}
+                    checked={tab.isForeign === "N"}
                     onChange={() => handleIsForeignChange("N")}
                     className="text-blue-600"
                   />
@@ -451,7 +611,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="radio"
-                    checked={isForeign === "Y"}
+                    checked={tab.isForeign === "Y"}
                     onChange={() => handleIsForeignChange("Y")}
                     className="text-blue-600"
                   />
@@ -467,13 +627,13 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               </label>
               <input
                 type="text"
-                value={idNumber}
+                value={tab.idNumber}
                 onChange={(e) => handleIdNumberChange(e.target.value)}
                 onBlur={handleIdNumberBlur}
                 placeholder="숫자만 입력 (10자리 또는 13자리)"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.idNumber && <p className="text-xs text-red-500 mt-1">{errors.idNumber}</p>}
+              {tab.errors.idNumber && <p className="text-xs text-red-500 mt-1">{tab.errors.idNumber}</p>}
             </div>
 
             {/* 업종코드 */}
@@ -482,7 +642,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                 업종코드 <span className="text-red-500">*</span>
               </label>
               <select
-                value={industryCode}
+                value={tab.industryCode}
                 onChange={(e) => handleIndustryCodeChange(e.target.value)}
                 onBlur={handleIndustryCodeBlur}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -494,7 +654,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                   </option>
                 ))}
               </select>
-              {errors.industryCode && <p className="text-xs text-red-500 mt-1">{errors.industryCode}</p>}
+              {tab.errors.industryCode && <p className="text-xs text-red-500 mt-1">{tab.errors.industryCode}</p>}
             </div>
 
             {/* 지급액 */}
@@ -504,13 +664,13 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               </label>
               <input
                 type="text"
-                value={displayAmountInput(paymentAmountRaw)}
+                value={displayAmountInput(tab.paymentAmountRaw)}
                 onChange={(e) => handlePaymentAmountChange(e.target.value)}
                 onBlur={handlePaymentAmountBlur}
                 placeholder="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              {errors.paymentAmount && <p className="text-xs text-red-500 mt-1">{errors.paymentAmount}</p>}
+              {tab.errors.paymentAmount && <p className="text-xs text-red-500 mt-1">{tab.errors.paymentAmount}</p>}
             </div>
 
             {/* 자동 계산 영역 */}
@@ -524,7 +684,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                     <label className="flex items-center gap-1 text-sm">
                       <input
                         type="radio"
-                        checked={selectedTaxRate === 3}
+                        checked={tab.selectedTaxRate === 3}
                         onChange={() => handleTaxRateChange(3)}
                         className="text-blue-600"
                       />
@@ -533,7 +693,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                     <label className="flex items-center gap-1 text-sm">
                       <input
                         type="radio"
-                        checked={selectedTaxRate === 20}
+                        checked={tab.selectedTaxRate === 20}
                         onChange={() => handleTaxRateChange(20)}
                         className="text-blue-600"
                       />
@@ -541,31 +701,36 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
                     </label>
                   </div>
                 ) : (
-                  <span className="text-sm font-medium text-gray-900">{displayTaxRateText}</span>
+                  <span className="text-sm font-medium text-gray-900">{displayTaxRate}</span>
                 )}
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">소득세</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {formatAmount(taxResult.incomeTax)}
+                  {formatAmount(tab.taxResult.incomeTax)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">지방소득세</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {formatAmount(taxResult.localTax)}
+                  {formatAmount(tab.taxResult.localTax)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between border-t border-gray-200 pt-2">
                 <span className="text-sm font-medium text-gray-700">실지급액</span>
                 <span className="text-sm font-bold text-gray-900">
-                  {formatAmount(taxResult.netPayment)}
+                  {formatAmount(tab.taxResult.netPayment)}
                 </span>
               </div>
             </div>
+
+            {/* 중복 에러 */}
+            {tab.errors.duplicate && (
+              <p className="text-xs text-red-500 bg-red-50 p-2 rounded">{tab.errors.duplicate}</p>
+            )}
 
             {/* 안내 문구 */}
             <div className="text-xs text-gray-500 space-y-1 bg-blue-50 p-3 rounded-lg">
@@ -581,7 +746,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               onClick={handleDelete}
               className="px-4 py-2 text-sm text-red-600 bg-red-50 rounded-md hover:bg-red-100"
             >
-              삭제
+              {isMulti ? "이 건 삭제" : "삭제"}
             </button>
             <div className="flex gap-2">
               <button
@@ -592,7 +757,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={hasErrors}
+                disabled={hasAnyErrors}
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 수정
@@ -612,7 +777,7 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
 
       {showDeleteConfirm && (
         <ConfirmDialog
-          message="사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다."
+          message={deleteConfirmMessage}
           onConfirm={confirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
         />
@@ -620,14 +785,16 @@ export default function BusinessIncomeEditPopup({ data, onClose, onSaved, onDele
 
       {showExceptionConfirm && (
         <ConfirmDialog
-          message={`해당 데이터는 ${attrYear}년 12월 사업소득에 표시됩니다.`}
+          message={exceptionConfirmMessage}
           onConfirm={() => {
             setShowExceptionConfirm(false);
-            doSave();
+            doSaveAll();
           }}
           onCancel={() => setShowExceptionConfirm(false)}
         />
       )}
+
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </>
   );
 }

@@ -18,7 +18,6 @@ import Toast from "@/components/manage/Toast";
 import ConfirmDialog from "@/components/manage/ConfirmDialog";
 import BusinessIncomeAddPopup from "@/components/sps/BusinessIncomeAddPopup";
 import BusinessIncomeEditPopup from "@/components/sps/BusinessIncomeEditPopup";
-import BusinessIncomeGroupEditPopup from "@/components/sps/BusinessIncomeGroupEditPopup";
 
 function MonthlyContent() {
   const searchParams = useSearchParams();
@@ -45,8 +44,7 @@ function MonthlyContent() {
   } | null>(null);
 
   const [showAddPopup, setShowAddPopup] = useState(false);
-  const [editTarget, setEditTarget] = useState<BusinessIncome | null>(null);
-  const [editTargetGroup, setEditTargetGroup] = useState<BusinessIncome[] | null>(null);
+  const [editTargets, setEditTargets] = useState<BusinessIncome[] | null>(null);
 
   const loadData = useCallback(() => {
     if (!isValid) return;
@@ -202,13 +200,9 @@ function MonthlyContent() {
     URL.revokeObjectURL(url);
   };
 
-  // 행 클릭 → 합산행이면 그룹 수정 팝업, 아니면 기존 수정 팝업
+  // 행 클릭 → 수정 팝업 (단건/다건 통합)
   const handleRowClick = (row: AggregatedRow) => {
-    if (row.isAggregated) {
-      setEditTargetGroup(row.records);
-    } else {
-      setEditTarget(row.records[0]);
-    }
+    setEditTargets(row.records);
   };
 
   // Add popup callbacks
@@ -219,25 +213,13 @@ function MonthlyContent() {
   };
 
   const handleEditSaved = () => {
-    setEditTarget(null);
+    setEditTargets(null);
     setToast("사업소득 수정을 완료했습니다.");
     loadData();
   };
 
   const handleEditDeleted = () => {
-    setEditTarget(null);
-    setToast("사업소득 삭제를 완료했습니다.");
-    loadData();
-  };
-
-  const handleGroupEditSaved = () => {
-    setEditTargetGroup(null);
-    setToast("사업소득 그룹 수정을 완료했습니다.");
-    loadData();
-  };
-
-  const handleGroupEditDeleted = () => {
-    setEditTargetGroup(null);
+    setEditTargets(null);
     setToast("사업소득 삭제를 완료했습니다.");
     loadData();
   };
@@ -304,12 +286,18 @@ function MonthlyContent() {
 
       {/* 검색 + 액션 바 */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <SearchBar
-          placeholder="성명(상호) 검색"
-          onSearch={handleSearch}
-          maxLength={50}
-          allowSpecialChar={false}
-        />
+        <div className="flex items-center gap-3">
+          <SearchBar
+            placeholder="성명(상호) 검색"
+            onSearch={handleSearch}
+            maxLength={50}
+            allowSpecialChar={false}
+          />
+          <span className="text-sm text-gray-500 whitespace-nowrap">
+            총 <span className="font-semibold text-gray-900">{filteredRows.length}</span>행
+            {" "}({filteredRows.reduce((sum, r) => sum + r.records.length, 0)}건)
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <PageSizeSelect value={pageSize} onChange={(s) => { setPageSize(s); setCurrentPage(1); }} />
 
@@ -460,21 +448,13 @@ function MonthlyContent() {
         />
       )}
 
-      {editTarget && (
+      {editTargets && (
         <BusinessIncomeEditPopup
-          data={editTarget}
-          onClose={() => setEditTarget(null)}
+          records={editTargets}
+          onClose={() => setEditTargets(null)}
           onSaved={handleEditSaved}
           onDeleted={handleEditDeleted}
-        />
-      )}
-
-      {editTargetGroup && (
-        <BusinessIncomeGroupEditPopup
-          records={editTargetGroup}
-          onClose={() => setEditTargetGroup(null)}
-          onSaved={handleGroupEditSaved}
-          onDeleted={handleGroupEditDeleted}
+          onRefresh={loadData}
         />
       )}
 
