@@ -183,6 +183,8 @@ export default function BusinessIncomeAddPopup({ paymentYear, paymentMonth, onCl
   const handlePaymentAmountBlur = () => {
     if (!paymentAmountRaw) {
       setError("paymentAmount", "필수 입력 항목입니다.");
+    } else if (parseInt(paymentAmountRaw, 10) === 0) {
+      setError("paymentAmount", "지급액은 1원 이상 입력해야 합니다.");
     } else {
       setError("paymentAmount", null);
     }
@@ -279,7 +281,11 @@ export default function BusinessIncomeAddPopup({ paymentYear, paymentMonth, onCl
     if (!name.trim()) newErrors.name = "필수 입력 항목입니다.";
     if (!idNumber) newErrors.idNumber = "필수 입력 항목입니다.";
     if (!industryCode) newErrors.industryCode = "필수 입력 항목입니다.";
-    if (!paymentAmountRaw) newErrors.paymentAmount = "필수 입력 항목입니다.";
+    if (!paymentAmountRaw) {
+      newErrors.paymentAmount = "필수 입력 항목입니다.";
+    } else if (parseInt(paymentAmountRaw, 10) === 0) {
+      newErrors.paymentAmount = "지급액은 1원 이상 입력해야 합니다.";
+    }
 
     if (idNumber) {
       const lenErr = validateIdNumberLength(idNumber);

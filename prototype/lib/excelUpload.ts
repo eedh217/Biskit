@@ -66,24 +66,37 @@ function validateRow(
     return { error: "귀속연도는 숫자로 입력해주세요." };
   }
 
-  // 3. 지급연도 숫자 검증
+  // 3. 귀속연도 범위 검증
+  const currentYear = new Date().getFullYear();
+  const attrYearNum = Number(raw.attributionYear);
+  if (attrYearNum < 2025 || attrYearNum > currentYear) {
+    return { error: `귀속연도는 2025년부터 ${currentYear}년까지 입력 가능합니다.` };
+  }
+
+  // 4. 지급연도 숫자 검증
   if (!isInteger(raw.paymentYear)) {
     return { error: "지급연도는 숫자로 입력해주세요." };
   }
 
-  // 4. 귀속월 범위 검증
+  // 5. 지급연도 범위 검증
+  const payYearNum = Number(raw.paymentYear);
+  if (payYearNum < 2025 || payYearNum > currentYear + 1) {
+    return { error: `지급연도는 2025년부터 ${currentYear + 1}년까지 입력 가능합니다.` };
+  }
+
+  // 6. 귀속월 범위 검증
   const attrMonthNum = Number(raw.attributionMonth);
   if (!isInteger(raw.attributionMonth) || attrMonthNum < 1 || attrMonthNum > 12) {
     return { error: "귀속월은 1~12 내 숫자로 입력해주세요." };
   }
 
-  // 5. 지급월 범위 검증
+  // 7. 지급월 범위 검증
   const payMonthNum = Number(raw.paymentMonth);
   if (!isInteger(raw.paymentMonth) || payMonthNum < 1 || payMonthNum > 12) {
     return { error: "지급월은 1~12 내 숫자로 입력해주세요." };
   }
 
-  // 6. 지급연월 vs 귀속연월 선후관계
+  // 8. 지급연월 vs 귀속연월 선후관계
   const ay = Number(raw.attributionYear);
   const am = Number(raw.attributionMonth);
   const py = Number(raw.paymentYear);
@@ -92,44 +105,44 @@ function validateRow(
     return { error: "지급연월은 귀속연월 이후 날짜여야 합니다." };
   }
 
-  // 7. 내외국인 구분 검증
+  // 9. 내외국인 구분 검증
   if (isForeign !== "N" && isForeign !== "Y") {
     return { error: "내외국인 구분은 N, Y로 입력해주세요." };
   }
 
-  // 8. 업종코드 유효성
+  // 10. 업종코드 유효성
   if (!VALID_INDUSTRY_CODES.has(industryCode)) {
     return { error: "유효하지 않은 업종코드입니다." };
   }
 
-  // 9. 지급액 숫자 검증
+  // 11. 지급액 숫자 검증
   if (!isInteger(raw.paymentSum)) {
     return { error: "지급액은 숫자만 입력 가능합니다." };
   }
 
-  // 10. 지급액 양수 검증
+  // 12. 지급액 양수 검증
   const paymentAmount = Number(raw.paymentSum);
   if (paymentAmount <= 0) {
     return { error: "지급액을 양수로 입력해주세요." };
   }
 
-  // 11. 지급액 자릿수 검증
+  // 13. 지급액 자릿수 검증
   if (paymentSum.replace(/^-/, "").length > 12) {
     return { error: "지급액은 최대 12자리까지 입력 가능합니다." };
   }
 
-  // 12. 성명(상호) 길이 검증
+  // 14. 성명(상호) 길이 검증
   if (name.length > 50) {
     return { error: "성명(상호)는 최대 50자까지 입력 가능합니다." };
   }
 
-  // 13. 주민(사업자)등록번호 자릿수 검증
+  // 15. 주민(사업자)등록번호 자릿수 검증
   const cleanedIino = iino.replace(/[^0-9]/g, "");
   if (cleanedIino.length > 13) {
     return { error: "주민(사업자)등록번호는 최대 13자리까지 입력 가능합니다." };
   }
 
-  // 14. 주민등록번호 형식 검증 (13자리인 경우)
+  // 16. 주민등록번호 형식 검증 (13자리인 경우)
   if (cleanedIino.length === 13) {
     const checkErr = validateIdNumberCheckDigit(cleanedIino);
     if (checkErr) {
@@ -137,14 +150,14 @@ function validateRow(
     }
   }
 
-  // 15. 외국인 직업운동가 세율 검증
+  // 17. 외국인 직업운동가 세율 검증
   if (isForeign === "Y" && industryCode === "940904") {
     if (!taxRate || (taxRate !== "3" && taxRate !== "20")) {
       return { error: "외국인 직업운동가일 경우, 세율을 3 또는 20으로 입력해주세요." };
     }
   }
 
-  // 16. 중복 데이터 검사 (기존 데이터 + 이번 업로드 내 선행 행)
+  // 18. 중복 데이터 검사 (기존 데이터 + 이번 업로드 내 선행 행)
   const dupKey = `${py}-${pm}-${ay}-${am}-${cleanedIino}-${industryCode}`;
   if (existingKeys.has(dupKey)) {
     return { error: "지급연월 기준 귀속연월, 주민(사업자)등록번호, 업종코드가 동일한 사업소득이 존재합니다." };

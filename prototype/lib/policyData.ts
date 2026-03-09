@@ -237,9 +237,12 @@ const spsAddFields: PolicyField[] = [
     name: "지급액",
     required: true,
     type: "number",
-    description: "0 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
-    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거"],
-    errorMessages: { required: "필수 입력 항목입니다." },
+    description: "**0원 입력 불가**. 1원 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
+    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거", "0원 입력 시 에러"],
+    errorMessages: {
+      required: "필수 입력 항목입니다.",
+      zeroAmount: "지급액은 1원 이상 입력해야 합니다."
+    },
   },
 ];
 
@@ -287,6 +290,10 @@ export const spsAddPolicy: PolicyModule = {
     description: ["추가 팝업에서는 삭제 기능 없음"],
   },
   extraPolicies: [
+    {
+      title: "지급액 입력 제한",
+      description: "**0원 입력 불가**. 1원 이상만 허용. 수정 팝업과 차이점 (수정 팝업은 0원 허용).",
+    },
     {
       title: "세율 결정 로직",
       description: "기본 3%. 봉사료수취자(940905) → 5% 고정. 외국인+직업운동가(940904) → 라디오 버튼으로 3%/20% 선택 (기본 3%).",
@@ -367,7 +374,7 @@ const spsEditFields: PolicyField[] = [
     name: "지급액",
     required: true,
     type: "number",
-    description: "수정 가능. 0 이상 정수, 최대 12자리.",
+    description: "수정 가능. **0원 입력 허용 (추가 팝업과 차이점)**. 0 이상 정수, 최대 12자리.",
   },
 ];
 
@@ -699,9 +706,12 @@ const spsAllAddFields: PolicyField[] = [
     name: "지급액",
     required: true,
     type: "number",
-    description: "0 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
-    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거"],
-    errorMessages: { required: "필수 입력 항목입니다." },
+    description: "**0원 입력 불가**. 1원 이상 정수만 허용. 최대 12자리. 천 단위 콤마 표시.",
+    validation: ["숫자만 입력 가능", "앞자리 0 자동 제거", "0원 입력 시 에러"],
+    errorMessages: {
+      required: "필수 입력 항목입니다.",
+      zeroAmount: "지급액은 1원 이상 입력해야 합니다."
+    },
   },
 ];
 
@@ -749,6 +759,10 @@ export const spsAllAddPolicy: PolicyModule = {
     description: ["추가 팝업에서는 삭제 기능 없음"],
   },
   extraPolicies: [
+    {
+      title: "지급액 입력 제한",
+      description: "**0원 입력 불가**. 1원 이상만 허용. 수정 팝업과 차이점 (수정 팝업은 0원 허용).",
+    },
     {
       title: "SPS_BI_03 대비 차이점",
       description: "지급연도(2025~현재+1)와 지급월(1~12)을 사용자가 직접 셀렉트박스로 선택. SPS_BI_03에서는 부모 화면이 고정값을 전달.",
@@ -846,7 +860,7 @@ const spsAllEditFields: PolicyField[] = [
     name: "지급액",
     required: true,
     type: "number",
-    description: "수정 가능. 0원 입력 허용. 최대 12자리.",
+    description: "수정 가능. **0원 입력 허용 (추가 팝업과 차이점)**. 0 이상 정수, 최대 12자리.",
   },
 ];
 
@@ -898,6 +912,10 @@ export const spsAllEditPolicy: PolicyModule = {
     warning: "사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.",
   },
   extraPolicies: [
+    {
+      title: "지급액 0원 허용",
+      description: "**수정 팝업에서는 0원 입력 허용**. 추가 팝업과 차이점 (추가 팝업은 1원 이상만 허용).",
+    },
     {
       title: "SPS_BI_04 대비 차이점",
       description: "지급연도/지급월이 표시되고 수정 가능. 성명·내외국인·주민번호도 수정 가능. 삭제 후 SPS_BI_05로 이동(SPS_BI_04는 SPS_BI_02로 이동).",
