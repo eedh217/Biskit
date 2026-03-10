@@ -91,6 +91,13 @@ export interface ExtraPolicy {
   description: string;
 }
 
+export interface CommonPolicy {
+  id: string;
+  title: string;
+  description: string;
+  mdFile: string;
+}
+
 export type TestCaseStatus = "pass" | "fail" | "pending";
 export type TestCasePriority = "high" | "medium" | "low";
 

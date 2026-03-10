@@ -4,8 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
+    "build": "npm run copy-policies && next build",
+    "start": "next start",
+    "copy-policies": "node scripts/copy-policies.js"
   },
   "dependencies": {
     "natural": "^8.1.0",

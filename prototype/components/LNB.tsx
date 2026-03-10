@@ -20,6 +20,13 @@ function getMenuItems(depth1: string): MenuItem2depth[] {
     case "policy":
       return [
         {
+          label: "공통 정책",
+          children: [
+            { label: "공통 UI", href: "/policy/common/common-ui" },
+            { label: "엑셀 업로드", href: "/policy/common/excel-upload" },
+          ],
+        },
+        {
           label: "사업소득",
           children: [
             { label: "월별 사업소득", href: "/policy/sps/monthly" },
@@ -52,6 +59,7 @@ export default function LNB({ isOpen = true }: { isOpen?: boolean }) {
   const pathname = usePathname();
   const depth1 = getDepth1FromPathname(pathname);
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    "공통 정책": true,
     사업소득: true,
   });
 
