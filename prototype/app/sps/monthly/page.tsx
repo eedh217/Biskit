@@ -78,9 +78,10 @@ function MonthlyContent() {
     applySearch(allData, query);
   };
 
-  // 상단 요약 (항상 전체 개별 레코드 기준)
+  // 상단 요약 (항상 전체 데이터 기준, 건수는 합산 후 행 개수)
+  const allAggregated = useMemo(() => aggregateForMonthlyList(allData), [allData]);
   const summary = {
-    count: allData.length,
+    count: allAggregated.length, // 합산 후 행 개수
     totalPayment: allData.reduce((sum, i) => sum + i.paymentAmount, 0),
     totalIncomeTax: allData.reduce((sum, i) => sum + i.incomeTax, 0),
     totalLocalTax: allData.reduce((sum, i) => sum + i.localTax, 0),
@@ -125,8 +126,21 @@ function MonthlyContent() {
   // 선택 삭제
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
+
+    // 선택된 행 개수 계산
+    const selectedRowsCount = filteredRows.filter(row =>
+      row.records.every(r => selectedIds.has(r.id))
+    ).length;
+
+    // 합산된 데이터가 있는지 확인
+    const hasAggregated = selectedRowsCount !== selectedIds.size;
+
+    const message = hasAggregated
+      ? `총 ${selectedRowsCount}건(${selectedIds.size}개)의 리스트를 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`
+      : `총 ${selectedIds.size}건의 리스트를 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`;
+
     setConfirmDialog({
-      message: `선택한 ${selectedIds.size}건의 사업소득을 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`,
+      message,
       onConfirm: () => {
         deleteBusinessIncomes(Array.from(selectedIds));
         setConfirmDialog(null);
@@ -294,8 +308,8 @@ function MonthlyContent() {
             allowSpecialChar={false}
           />
           <span className="text-sm text-gray-500 whitespace-nowrap">
-            총 <span className="font-semibold text-gray-900">{filteredRows.length}</span>행
-            {" "}({filteredRows.reduce((sum, r) => sum + r.records.length, 0)}건)
+            총 <span className="font-semibold text-gray-900">{filteredRows.length}</span>건
+            {" "}({filteredRows.reduce((sum, r) => sum + r.records.length, 0)}개)
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -411,7 +425,7 @@ function MonthlyContent() {
                     <span>{formatAmount(row.paymentAmount)}</span>
                     {row.isAggregated && (
                       <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">
-                        {row.records.length}건 합산
+                        {row.records.length}개 합산
                       </span>
                     )}
                   </td>
@@ -428,8 +442,8 @@ function MonthlyContent() {
       {/* 페이지네이션 */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-500">
-          총 {filteredRows.length}행 ({allData.length}건) 중 {(currentPage - 1) * pageSize + 1}~
-          {Math.min(currentPage * pageSize, filteredRows.length)}행
+          총 {filteredRows.length}건 ({allData.length}개) 중 {(currentPage - 1) * pageSize + 1}~
+          {Math.min(currentPage * pageSize, filteredRows.length)}건
         </span>
         <Pagination
           currentPage={currentPage}
