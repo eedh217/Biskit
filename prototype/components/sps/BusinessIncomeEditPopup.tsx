@@ -433,18 +433,20 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
       return;
     }
 
-    // Check exception industry
+    // Check exception industry - only show confirm for single mode
     const hasException = tabs.some(
       (tab) =>
         isExceptionIndustry(tab.industryCode) &&
         Number(tab.attrYear) !== tab.paymentYear
     );
 
-    if (hasException) {
+    if (hasException && !isMulti) {
+      // Single mode: show confirm
       setShowExceptionConfirm(true);
       return;
     }
 
+    // Multi mode: save directly without confirm
     doSaveAll();
   };
 
@@ -500,10 +502,8 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
     ? `${tab.paymentYear}년 ${tab.paymentMonth}월 지급 건을 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`
     : "사업소득을 삭제하시겠습니까? 삭제한 정보는 복구할 수 없습니다.";
 
-  // Exception confirm message differs by mode
-  const exceptionConfirmMessage = isMulti
-    ? "예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다."
-    : `해당 데이터는 ${tab.attrYear}년 12월 사업소득에 표시됩니다.`;
+  // Exception confirm message (single mode only)
+  const exceptionConfirmMessage = `해당 데이터는 ${tab.attrYear}년 12월 사업소득에 표시됩니다.`;
 
   return (
     <>

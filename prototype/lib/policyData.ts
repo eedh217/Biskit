@@ -444,7 +444,7 @@ export const spsEditPolicy: PolicyModule = {
     },
     {
       title: "귀속 기준 예외 확인",
-      description: "단건: 예외 업종 + 귀속연도≠지급연도 시 confirm \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\" / 다건: \"예외 업종 데이터가 포함되어 있습니다. 귀속연도 12월에 표시됩니다.\"",
+      description: "단건: 예외 업종 + 귀속연도≠지급연도 시 confirm \"해당 데이터는 YYYY년 12월 사업소득에 표시됩니다.\" / 다건: confirm 없이 바로 저장 후 토스트만 노출",
     },
     {
       title: "탭 구조 (다건 모드)",
