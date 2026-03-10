@@ -1,48 +1,25 @@
-"use client";
+import fs from "fs";
+import path from "path";
+import { spsAllTabs } from "@/lib/spsPolicyConfig";
+import SpsPolicyTabs from "@/components/SpsPolicyTabs";
 
-import { useState } from "react";
-import {
-  spsAllListPolicy,
-  spsAllAddPolicy,
-  spsAllEditPolicy,
-  spsExcelPolicy,
-} from "@/lib/policyData";
-import PolicyDetailContent from "@/components/PolicyDetailContent";
-
-const tabs = [
-  { id: "sps-all-list", label: "전체 사업소득", policy: spsAllListPolicy },
-  { id: "sps-excel", label: "엑셀업로드", policy: spsExcelPolicy },
-  { id: "sps-all-add", label: "전체 사업소득 추가", policy: spsAllAddPolicy },
-  { id: "sps-all-edit", label: "전체 사업소득 수정", policy: spsAllEditPolicy },
-];
+// 서버에서 MD 파일 읽기
+function getPolicyContent(mdFile: string): string {
+  const filePath = path.join(process.cwd(), "policy", "SPS", mdFile);
+  try {
+    return fs.readFileSync(filePath, "utf-8");
+  } catch (error) {
+    console.error("Failed to read markdown file:", error);
+    return "# 오류\n\n정책 파일을 읽을 수 없습니다.";
+  }
+}
 
 export default function PolicySpsAllPage() {
-  const [activeTab, setActiveTab] = useState(tabs[0].id);
-  const activePolicy = tabs.find((t) => t.id === activeTab)!.policy;
+  // 탭 데이터 생성 (MD 파일 읽기)
+  const tabs = spsAllTabs.map((tab) => ({
+    ...tab,
+    content: getPolicyContent(tab.mdFile),
+  }));
 
-  return (
-    <div className="space-y-6">
-      {/* 탭 바 */}
-      <div className="border-b border-gray-200">
-        <div className="flex gap-0 -mb-px overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-blue-600 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* 탭 콘텐츠 */}
-      <PolicyDetailContent policy={activePolicy} />
-    </div>
-  );
+  return <SpsPolicyTabs tabs={tabs} />;
 }
