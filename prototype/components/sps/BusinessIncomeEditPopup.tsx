@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { BusinessIncome } from "@/types/sps";
 import { INDUSTRY_CODES, isExceptionIndustry, GRATUITY_CODE } from "@/lib/industryCodes";
 import { determineTaxRate, calculateTax, needsTaxRateSelection } from "@/lib/taxCalculation";
@@ -80,7 +80,17 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showExceptionConfirm, setShowExceptionConfirm] = useState(false);
+  const [showTabSwitchConfirm, setShowTabSwitchConfirm] = useState(false);
+  const [targetTabIndex, setTargetTabIndex] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Field refs for focus management
+  const attrYearRef = useRef<HTMLSelectElement>(null);
+  const attrMonthRef = useRef<HTMLSelectElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const idNumberRef = useRef<HTMLInputElement>(null);
+  const industryCodeRef = useRef<HTMLSelectElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
 
   const initialRef = useRef(
     records.map((r) => ({
@@ -113,6 +123,52 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
       );
     });
   }, [tabs]);
+
+  const isCurrentTabDirty = useCallback(() => {
+    const tab = tabs[activeTabIndex];
+    const init = initialRef.current.find((i) => i.id === tab.id);
+    if (!init) return true;
+    return (
+      tab.attrYear !== init.attrYear ||
+      tab.attrMonth !== init.attrMonth ||
+      tab.name !== init.name ||
+      tab.isForeign !== init.isForeign ||
+      tab.idNumber !== init.idNumber ||
+      tab.industryCode !== init.industryCode ||
+      tab.paymentAmountRaw !== init.paymentAmountRaw
+    );
+  }, [tabs, activeTabIndex]);
+
+  const restoreCurrentTab = useCallback(() => {
+    const tab = tabs[activeTabIndex];
+    const init = initialRef.current.find((i) => i.id === tab.id);
+    if (!init) return;
+
+    const original = records.find((r) => r.id === tab.id);
+    if (!original) return;
+
+    const restored = createTabState(original);
+    setTabs((prev) => prev.map((t, i) => (i === activeTabIndex ? restored : t)));
+  }, [tabs, activeTabIndex, records]);
+
+  const focusFirstError = useCallback(() => {
+    const tab = tabs[activeTabIndex];
+    const errors = tab.errors;
+
+    if (errors.attrYear || errors.attrDate || errors.duplicate) {
+      attrYearRef.current?.focus();
+    } else if (errors.attrMonth) {
+      attrMonthRef.current?.focus();
+    } else if (errors.name) {
+      nameRef.current?.focus();
+    } else if (errors.idNumber) {
+      idNumberRef.current?.focus();
+    } else if (errors.industryCode) {
+      industryCodeRef.current?.focus();
+    } else if (errors.paymentAmount) {
+      paymentAmountRef.current?.focus();
+    }
+  }, [tabs, activeTabIndex]);
 
   const handleClose = () => {
     if (isDirty()) {
@@ -356,6 +412,65 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
     onRefresh?.();
   };
 
+  // Validate current tab only
+  const validateCurrentTab = (): boolean => {
+    const tab = tabs[activeTabIndex];
+    const newErrors: Record<string, string> = {};
+
+    if (!tab.attrYear) newErrors.attrYear = "필수 입력 항목입니다.";
+    if (!tab.attrMonth) newErrors.attrMonth = "필수 입력 항목입니다.";
+    if (!tab.name.trim()) newErrors.name = "필수 입력 항목입니다.";
+    if (!tab.idNumber) newErrors.idNumber = "필수 입력 항목입니다.";
+    if (!tab.industryCode) newErrors.industryCode = "필수 입력 항목입니다.";
+    if (!tab.paymentAmountRaw) newErrors.paymentAmount = "필수 입력 항목입니다.";
+
+    if (tab.idNumber) {
+      const lenErr = validateIdNumberLength(tab.idNumber);
+      if (lenErr) newErrors.idNumber = lenErr;
+      else {
+        const chkErr = validateIdNumberCheckDigit(tab.idNumber);
+        if (chkErr) newErrors.idNumber = chkErr;
+      }
+    }
+
+    if (tab.industryCode && tab.idNumber) {
+      const hospErr = validateHospitalIdNumber(tab.industryCode, tab.idNumber);
+      if (hospErr) newErrors.industryCode = hospErr;
+    }
+
+    if (tab.attrYear && tab.attrMonth) {
+      const dateErr = validateAttributionDate(
+        Number(tab.attrYear),
+        Number(tab.attrMonth),
+        tab.paymentYear,
+        tab.paymentMonth
+      );
+      if (dateErr) newErrors.attrDate = dateErr;
+    }
+
+    // Duplicate check (excluding self)
+    const all = getBusinessIncomes();
+    const dup = all.some(
+      (item) =>
+        item.id !== tab.id &&
+        item.paymentYear === tab.paymentYear &&
+        item.paymentMonth === tab.paymentMonth &&
+        item.attributionYear === Number(tab.attrYear) &&
+        item.attributionMonth === Number(tab.attrMonth) &&
+        item.idNumber === tab.idNumber &&
+        item.industryCode === tab.industryCode
+    );
+    if (dup) {
+      newErrors.duplicate = "지급연월, 귀속연월, 주민(사업자)등록번호, 업종코드가 동일한 사업소득이 존재합니다.";
+    }
+
+    setTabs((prev) =>
+      prev.map((t, i) => (i === activeTabIndex ? { ...t, errors: newErrors } : t))
+    );
+
+    return Object.keys(newErrors).length === 0;
+  };
+
   // Validate all tabs
   const validateAllTabs = (): number | null => {
     let firstErrorTab: number | null = null;
@@ -426,19 +541,61 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
     return firstErrorTab;
   };
 
+  const doSaveCurrent = () => {
+    const tab = tabs[activeTabIndex];
+    const amount = parseInt(tab.paymentAmountRaw, 10);
+    const taxRate = determineTaxRate(tab.industryCode, tab.isForeign, tab.selectedTaxRate);
+    const tax = calculateTax(amount, taxRate);
+
+    const result = updateBusinessIncome(tab.id, {
+      attributionYear: Number(tab.attrYear),
+      attributionMonth: Number(tab.attrMonth),
+      name: tab.name.trim(),
+      isForeign: tab.isForeign,
+      idNumber: tab.idNumber,
+      industryCode: tab.industryCode,
+      paymentAmount: amount,
+      taxRate: tax.taxRate,
+      incomeTax: tax.incomeTax,
+      localTax: tax.localTax,
+      netPayment: tax.netPayment,
+    });
+
+    if (!result.success) {
+      alert(result.error || "저장 중 오류가 발생했습니다.");
+      return false;
+    }
+
+    // Update initialRef to reflect saved state
+    initialRef.current = initialRef.current.map((init) =>
+      init.id === tab.id
+        ? {
+            id: tab.id,
+            attrYear: tab.attrYear,
+            attrMonth: tab.attrMonth,
+            name: tab.name,
+            isForeign: tab.isForeign,
+            idNumber: tab.idNumber,
+            industryCode: tab.industryCode,
+            paymentAmountRaw: tab.paymentAmountRaw,
+          }
+        : init
+    );
+
+    return true;
+  };
+
   const handleSubmit = () => {
-    const firstErrorTab = validateAllTabs();
-    if (firstErrorTab !== null) {
-      setActiveTabIndex(firstErrorTab);
+    // Validate current tab only
+    const isValid = validateCurrentTab();
+    if (!isValid) {
       return;
     }
 
     // Check exception industry - only show confirm for single mode
-    const hasException = tabs.some(
-      (tab) =>
-        isExceptionIndustry(tab.industryCode) &&
-        Number(tab.attrYear) !== tab.paymentYear
-    );
+    const tab = tabs[activeTabIndex];
+    const hasException =
+      isExceptionIndustry(tab.industryCode) && Number(tab.attrYear) !== tab.paymentYear;
 
     if (hasException && !isMulti) {
       // Single mode: show confirm
@@ -446,8 +603,11 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
       return;
     }
 
-    // Multi mode: save directly without confirm
-    doSaveAll();
+    // Multi mode or no exception: save current tab directly
+    const saved = doSaveCurrent();
+    if (saved) {
+      onSaved();
+    }
   };
 
   const doSaveAll = () => {
@@ -479,6 +639,53 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
     onSaved();
   };
 
+  const handleTabClick = (targetIndex: number) => {
+    if (targetIndex === activeTabIndex) return;
+
+    const currentTab = tabs[activeTabIndex];
+    const hasErrors = Object.keys(currentTab.errors).length > 0;
+
+    if (hasErrors) {
+      // Focus first error field
+      focusFirstError();
+      return;
+    }
+
+    const dirty = isCurrentTabDirty();
+    if (dirty) {
+      // Show confirm
+      setTargetTabIndex(targetIndex);
+      setShowTabSwitchConfirm(true);
+      return;
+    }
+
+    // No errors and not dirty, switch tab directly
+    setActiveTabIndex(targetIndex);
+  };
+
+  const confirmTabSwitch = () => {
+    if (targetTabIndex === null) return;
+
+    // Save current tab
+    const saved = doSaveCurrent();
+    if (saved) {
+      setShowTabSwitchConfirm(false);
+      setActiveTabIndex(targetTabIndex);
+      setTargetTabIndex(null);
+      onRefresh?.();
+    }
+  };
+
+  const cancelTabSwitch = () => {
+    if (targetTabIndex === null) return;
+
+    // Restore current tab to original state
+    restoreCurrentTab();
+    setShowTabSwitchConfirm(false);
+    setActiveTabIndex(targetTabIndex);
+    setTargetTabIndex(null);
+  };
+
   const currentYear = new Date().getFullYear();
   const yearOptions: number[] = [];
   for (let y = 2025; y <= currentYear; y++) yearOptions.push(y);
@@ -495,7 +702,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
       : "3%"
     : "-";
 
-  const hasAnyErrors = tabs.some((t) => Object.keys(t.errors).length > 0);
+  const hasCurrentTabErrors = Object.keys(tab.errors).length > 0;
 
   // Delete confirm message differs by mode
   const deleteConfirmMessage = isMulti
@@ -525,7 +732,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                 return (
                   <button
                     key={t.id}
-                    onClick={() => setActiveTabIndex(i)}
+                    onClick={() => handleTabClick(i)}
                     className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                       i === activeTabIndex
                         ? "border-blue-600 text-blue-600"
@@ -550,6 +757,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
               </label>
               <div className="flex gap-2">
                 <select
+                  ref={attrYearRef}
                   value={tab.attrYear}
                   onChange={(e) => handleAttrYearChange(e.target.value)}
                   onBlur={handleAttrYearBlur}
@@ -561,6 +769,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                   ))}
                 </select>
                 <select
+                  ref={attrMonthRef}
                   value={tab.attrMonth}
                   onChange={(e) => handleAttrMonthChange(e.target.value)}
                   onBlur={handleAttrMonthBlur}
@@ -583,6 +792,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                 성명(상호) <span className="text-red-500">*</span>
               </label>
               <input
+                ref={nameRef}
                 type="text"
                 value={tab.name}
                 onChange={(e) => handleNameChange(e.target.value)}
@@ -626,6 +836,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                 주민(사업자)등록번호 <span className="text-red-500">*</span>
               </label>
               <input
+                ref={idNumberRef}
                 type="text"
                 value={tab.idNumber}
                 onChange={(e) => handleIdNumberChange(e.target.value)}
@@ -642,6 +853,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                 업종코드 <span className="text-red-500">*</span>
               </label>
               <select
+                ref={industryCodeRef}
                 value={tab.industryCode}
                 onChange={(e) => handleIndustryCodeChange(e.target.value)}
                 onBlur={handleIndustryCodeBlur}
@@ -663,6 +875,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
                 지급액 <span className="text-red-500">*</span>
               </label>
               <input
+                ref={paymentAmountRef}
                 type="text"
                 value={displayAmountInput(tab.paymentAmountRaw)}
                 onChange={(e) => handlePaymentAmountChange(e.target.value)}
@@ -757,7 +970,7 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
               </button>
               <button
                 onClick={handleSubmit}
-                disabled={hasAnyErrors}
+                disabled={hasCurrentTabErrors}
                 className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 수정
@@ -788,9 +1001,20 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
           message={exceptionConfirmMessage}
           onConfirm={() => {
             setShowExceptionConfirm(false);
-            doSaveAll();
+            const saved = doSaveCurrent();
+            if (saved) {
+              onSaved();
+            }
           }}
           onCancel={() => setShowExceptionConfirm(false)}
+        />
+      )}
+
+      {showTabSwitchConfirm && (
+        <ConfirmDialog
+          message="수정한 내용을 저장하시겠습니까?"
+          onConfirm={confirmTabSwitch}
+          onCancel={cancelTabSwitch}
         />
       )}
 
