@@ -105,8 +105,8 @@ export default function BusinessIncomeEditPopup({ records, onClose, onSaved, onD
     }))
   );
 
-  // Dynamic single/multi mode
-  const isMulti = tabs.length > 1;
+  // Fixed mode based on initial records count - does not change during deletion
+  const [isMulti] = useState(records.length > 1);
 
   const isDirty = useCallback(() => {
     return tabs.some((tab) => {
