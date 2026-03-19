@@ -51,12 +51,14 @@ export interface AggregatedRow {
 // Other Income (기타소득) Types
 // ============================================
 
+export type IncomeTypeCode = "자문/고문" | "자문/고문 외 인적용역";
+
 export interface OtherIncome {
   id: string;
   name: string;
   isForeign: "N" | "Y";
   idNumber: string;
-  incomeType: "자문/고문" | "자문/고문 외 인적용역";
+  incomeType: IncomeTypeCode;
   attributionYear: number;
   attributionMonth: number;
   paymentYear: number;

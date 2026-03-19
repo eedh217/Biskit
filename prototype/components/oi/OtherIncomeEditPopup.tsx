@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { OtherIncome } from "@/types/sps";
-import { INCOME_TYPES } from "@/lib/incomeTypes";
+import { OtherIncome, IncomeTypeCode } from "@/types/sps";
+import { INCOME_TYPES, isValidIncomeType } from "@/lib/incomeTypes";
 import { calculateOITax } from "@/lib/oiTaxCalculation";
 import { validateIdNumberLength, validateAttributionDate as validateAttrDate } from "@/lib/oiValidation";
 import { updateOtherIncome, deleteOtherIncomes, getOtherIncomes } from "@/lib/oiStore";
@@ -25,7 +25,7 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   const [name, setName] = useState(record.name);
   const [isForeign, setIsForeign] = useState<"N" | "Y">(record.isForeign);
   const [idNumber, setIdNumber] = useState(record.idNumber);
-  const [incomeType, setIncomeType] = useState(record.incomeType);
+  const [incomeType, setIncomeType] = useState<IncomeTypeCode>(record.incomeType);
   const [paymentCountRaw, setPaymentCountRaw] = useState(String(record.paymentCount));
   const [paymentAmountRaw, setPaymentAmountRaw] = useState(String(record.paymentAmount));
   const [necessaryExpenseRaw, setNecessaryExpenseRaw] = useState(String(record.necessaryExpense));
@@ -301,6 +301,16 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       return;
     }
 
+    // incomeType 검증
+    if (!isValidIncomeType(incomeType)) {
+      newErrors.incomeType = "유효하지 않은 소득구분입니다.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     // 중복 검사 (본인 제외)
     const all = getOtherIncomes();
     const dup = all.some(
@@ -322,6 +332,12 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   };
 
   const doSave = () => {
+    // incomeType 타입 안전성 보장
+    if (!isValidIncomeType(incomeType)) {
+      alert("유효하지 않은 소득구분입니다.");
+      return;
+    }
+
     const paymentCount = parseInt(paymentCountRaw, 10);
     const paymentAmount = parseInt(paymentAmountRaw, 10);
     const necessaryExpense = parseInt(necessaryExpenseRaw, 10);
@@ -337,10 +353,6 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       paymentCount,
       paymentAmount,
       necessaryExpense,
-      incomeAmount: tax.incomeAmount,
-      incomeTax: tax.incomeTax,
-      localTax: tax.localTax,
-      netIncome: tax.netIncome,
     });
 
     if (!result.success) {
@@ -474,7 +486,10 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
                     <input
                       type="radio"
                       checked={incomeType === it.code}
-                      onChange={() => { setIncomeType(it.code); setError("incomeType", null); }}
+                      onChange={() => {
+                        setIncomeType(it.code as IncomeTypeCode);
+                        setError("incomeType", null);
+                      }}
                       onBlur={handleIncomeTypeBlur}
                       className="text-blue-600"
                     />

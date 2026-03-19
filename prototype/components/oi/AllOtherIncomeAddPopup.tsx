@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { INCOME_TYPES } from "@/lib/incomeTypes";
+import { IncomeTypeCode } from "@/types/sps";
+import { INCOME_TYPES, isValidIncomeType } from "@/lib/incomeTypes";
 import { calculateOITax } from "@/lib/oiTaxCalculation";
 import { validateIdNumberLength, validateAttributionDate as validateAttrDate } from "@/lib/oiValidation";
 import { addOtherIncome, getOtherIncomes } from "@/lib/oiStore";
@@ -23,7 +24,7 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
   const [name, setName] = useState("");
   const [isForeign, setIsForeign] = useState<"N" | "Y">("N");
   const [idNumber, setIdNumber] = useState("");
-  const [incomeType, setIncomeType] = useState("");
+  const [incomeType, setIncomeType] = useState<IncomeTypeCode | "">("");
   const [paymentCountRaw, setPaymentCountRaw] = useState("");
   const [paymentAmountRaw, setPaymentAmountRaw] = useState("");
   const [necessaryExpenseRaw, setNecessaryExpenseRaw] = useState("");
@@ -306,6 +307,16 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
       return;
     }
 
+    // incomeType 검증
+    if (!isValidIncomeType(incomeType)) {
+      newErrors.incomeType = "유효하지 않은 소득구분입니다.";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+
     // 중복 검사
     const all = getOtherIncomes();
     const dup = all.some(
@@ -326,16 +337,21 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
   };
 
   const doSave = () => {
+    // incomeType이 빈 문자열이 아님을 여기서 확실히 보장
+    if (!isValidIncomeType(incomeType)) {
+      alert("유효하지 않은 소득구분입니다.");
+      return;
+    }
+
     const paymentCount = parseInt(paymentCountRaw, 10);
     const paymentAmount = parseInt(paymentAmountRaw, 10);
     const necessaryExpense = parseInt(necessaryExpenseRaw, 10);
-    const tax = calculateOITax(paymentAmount, necessaryExpense);
 
     const result = addOtherIncome({
       name: name.trim(),
       isForeign,
       idNumber,
-      incomeType,
+      incomeType, // 이제 타입 안전
       attributionYear: Number(attrYear),
       attributionMonth: Number(attrMonth),
       paymentYear: Number(paymentYear),
@@ -343,10 +359,6 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
       paymentCount,
       paymentAmount,
       necessaryExpense,
-      incomeAmount: tax.incomeAmount,
-      incomeTax: tax.incomeTax,
-      localTax: tax.localTax,
-      netIncome: tax.netIncome,
     });
 
     if (!result.success) {
@@ -513,7 +525,10 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
                     <input
                       type="radio"
                       checked={incomeType === it.code}
-                      onChange={() => { setIncomeType(it.code); setError("incomeType", null); }}
+                      onChange={() => {
+                        setIncomeType(it.code as IncomeTypeCode);
+                        setError("incomeType", null);
+                      }}
                       onBlur={handleIncomeTypeBlur}
                       className="text-blue-600"
                     />
