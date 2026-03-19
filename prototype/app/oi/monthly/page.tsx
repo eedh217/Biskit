@@ -2,22 +2,21 @@
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { BusinessIncome, AggregatedRow } from "@/types/sps";
+import { OtherIncome } from "@/types/sps";
 import {
-  getBusinessIncomesForMonthlyList,
-  aggregateForMonthlyList,
-  deleteBusinessIncomes,
+  getOtherIncomesForMonthlyList,
+  deleteOtherIncomes,
   deleteAllForMonth,
-} from "@/lib/store";
-import { getIndustryName } from "@/lib/industryCodes";
+} from "@/lib/oiStore";
+import { getIncomeTypeName } from "@/lib/incomeTypes";
 import { formatAmount, formatDateTime } from "@/lib/formatUtils";
 import SearchBar from "@/components/manage/SearchBar";
 import Pagination from "@/components/manage/Pagination";
 import PageSizeSelect from "@/components/manage/PageSizeSelect";
 import Toast from "@/components/manage/Toast";
 import ConfirmDialog from "@/components/manage/ConfirmDialog";
-import BusinessIncomeAddPopup from "@/components/sps/BusinessIncomeAddPopup";
-import BusinessIncomeEditPopup from "@/components/sps/BusinessIncomeEditPopup";
+import OtherIncomeAddPopup from "@/components/oi/OtherIncomeAddPopup";
+import OtherIncomeEditPopup from "@/components/oi/OtherIncomeEditPopup";
 
 function MonthlyContent() {
   const searchParams = useSearchParams();
@@ -31,8 +30,8 @@ function MonthlyContent() {
 
   const isValid = !isNaN(year) && !isNaN(month) && month >= 1 && month <= 12;
 
-  const [allData, setAllData] = useState<BusinessIncome[]>([]);
-  const [filteredRows, setFilteredRows] = useState<AggregatedRow[]>([]);
+  const [allData, setAllData] = useState<OtherIncome[]>([]);
+  const [filteredData, setFilteredData] = useState<OtherIncome[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState(30);
   const [currentPage, setCurrentPage] = useState(1);
@@ -42,13 +41,12 @@ function MonthlyContent() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
-
   const [showAddPopup, setShowAddPopup] = useState(false);
-  const [editTargets, setEditTargets] = useState<BusinessIncome[] | null>(null);
+  const [editTarget, setEditTarget] = useState<OtherIncome | null>(null);
 
   const loadData = useCallback(() => {
     if (!isValid) return;
-    const data = getBusinessIncomesForMonthlyList(year, month);
+    const data = getOtherIncomesForMonthlyList(year, month);
     // 최근 등록 순
     data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     setAllData(data);
@@ -60,16 +58,15 @@ function MonthlyContent() {
     loadData();
   }, [loadData]);
 
-  const applySearch = (data: BusinessIncome[], query: string) => {
-    let filteredData: BusinessIncome[];
+  const applySearch = (data: OtherIncome[], query: string) => {
+    let filtered: OtherIncome[];
     if (!query.trim()) {
-      filteredData = data;
+      filtered = data;
     } else {
       const q = query.trim().toLowerCase();
-      filteredData = data.filter((item) => item.name.toLowerCase().includes(q));
+      filtered = data.filter((item) => item.name.toLowerCase().includes(q));
     }
-    const aggregated = aggregateForMonthlyList(filteredData);
-    setFilteredRows(aggregated);
+    setFilteredData(filtered);
     setCurrentPage(1);
   };
 
@@ -78,73 +75,55 @@ function MonthlyContent() {
     applySearch(allData, query);
   };
 
-  // 상단 요약 (항상 전체 데이터 기준, 건수는 합산 후 행 개수)
-  const allAggregated = useMemo(() => aggregateForMonthlyList(allData), [allData]);
-  const summary = {
-    count: allAggregated.length, // 합산 후 행 개수
-    totalPayment: allData.reduce((sum, i) => sum + i.paymentAmount, 0),
+  // 상단 요약 (항상 전체 데이터 기준)
+  const summary = useMemo(() => ({
+    count: allData.length,
+    totalPaymentAmount: allData.reduce((sum, i) => sum + i.paymentAmount, 0),
+    totalNecessaryExpense: allData.reduce((sum, i) => sum + i.necessaryExpense, 0),
+    totalIncomeAmount: allData.reduce((sum, i) => sum + i.incomeAmount, 0),
     totalIncomeTax: allData.reduce((sum, i) => sum + i.incomeTax, 0),
     totalLocalTax: allData.reduce((sum, i) => sum + i.localTax, 0),
-    totalNetPayment: allData.reduce((sum, i) => sum + i.netPayment, 0),
-  };
+    totalNetIncome: allData.reduce((sum, i) => sum + i.netIncome, 0),
+  }), [allData]);
 
   // 페이지네이션
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
-  const paged = filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const paged = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  // 체크박스: 합산행 선택 시 내부 모든 레코드 ID 선택/해제
-  const allPageSelected = paged.length > 0 && paged.every((row) =>
-    row.records.every((r) => selectedIds.has(r.id))
-  );
+  // 체크박스
+  const allPageSelected = paged.length > 0 && paged.every((item) => selectedIds.has(item.id));
 
   const toggleSelectAll = () => {
     if (allPageSelected) {
       const next = new Set(selectedIds);
-      paged.forEach((row) => row.records.forEach((r) => next.delete(r.id)));
+      paged.forEach((item) => next.delete(item.id));
       setSelectedIds(next);
     } else {
       const next = new Set(selectedIds);
-      paged.forEach((row) => row.records.forEach((r) => next.add(r.id)));
+      paged.forEach((item) => next.add(item.id));
       setSelectedIds(next);
     }
   };
 
-  const toggleSelectRow = (row: AggregatedRow) => {
+  const toggleSelectItem = (id: string) => {
     const next = new Set(selectedIds);
-    const allSelected = row.records.every((r) => next.has(r.id));
-    if (allSelected) {
-      row.records.forEach((r) => next.delete(r.id));
+    if (next.has(id)) {
+      next.delete(id);
     } else {
-      row.records.forEach((r) => next.add(r.id));
+      next.add(id);
     }
     setSelectedIds(next);
   };
 
-  const isRowSelected = (row: AggregatedRow) =>
-    row.records.every((r) => selectedIds.has(r.id));
-
   // 선택 삭제
   const handleDeleteSelected = () => {
     if (selectedIds.size === 0) return;
-
-    // 선택된 행 개수 계산
-    const selectedRowsCount = filteredRows.filter(row =>
-      row.records.every(r => selectedIds.has(r.id))
-    ).length;
-
-    // 합산된 데이터가 있는지 확인
-    const hasAggregated = selectedRowsCount !== selectedIds.size;
-
-    const message = hasAggregated
-      ? `총 ${selectedRowsCount}건(${selectedIds.size}개)의 리스트를 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`
-      : `총 ${selectedIds.size}건의 리스트를 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`;
-
     setConfirmDialog({
-      message,
+      message: `총 ${selectedIds.size}건의 리스트를 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`,
       onConfirm: () => {
-        deleteBusinessIncomes(Array.from(selectedIds));
+        deleteOtherIncomes(Array.from(selectedIds));
         setConfirmDialog(null);
-        setToast("사업소득 삭제를 완료했습니다.");
+        setToast("기타소득 삭제를 완료했습니다.");
         loadData();
       },
     });
@@ -154,11 +133,11 @@ function MonthlyContent() {
   const handleDeleteAll = () => {
     if (allData.length === 0) return;
     setConfirmDialog({
-      message: `${year}년 ${month}월의 모든 사업소득(${allData.length}건)을 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`,
+      message: `${year}년 ${month}월의 모든 기타소득(${allData.length}건)을 삭제하시겠습니까?\n삭제한 정보는 복구할 수 없습니다.`,
       onConfirm: () => {
         deleteAllForMonth(year, month);
         setConfirmDialog(null);
-        setToast("사업소득 전체 삭제를 완료했습니다.");
+        setToast("기타소득 전체 삭제를 완료했습니다.");
         loadData();
       },
     });
@@ -166,12 +145,11 @@ function MonthlyContent() {
 
   // 엑셀 다운로드 (개별 레코드 단위)
   const handleExcelDownload = (mode: "all" | "filtered" | "selected") => {
-    let items: BusinessIncome[];
+    let items: OtherIncome[];
     if (mode === "selected") {
       items = allData.filter((item) => selectedIds.has(item.id));
     } else if (mode === "filtered") {
-      // filtered rows의 모든 개별 레코드
-      items = filteredRows.flatMap((row) => row.records);
+      items = filteredData;
     } else {
       items = allData;
     }
@@ -183,7 +161,8 @@ function MonthlyContent() {
 
     const headers = [
       "귀속연도", "귀속월", "성명(상호)", "내외국인", "주민(사업자)등록번호",
-      "업종코드", "업종명", "지급연도", "지급월", "지급액", "세율", "소득세", "지방소득세", "실지급액", "신고파일 최종 생성일",
+      "소득구분", "지급연도", "지급월", "지급건수", "지급액", "필요경비", "소득금액",
+      "소득세", "지방소득세", "실소득금액", "신고파일 최종 생성일",
     ];
 
     const rows = items.map((item) => [
@@ -192,15 +171,16 @@ function MonthlyContent() {
       item.name,
       item.isForeign === "Y" ? "외국인" : "내국인",
       item.idNumber,
-      item.industryCode,
-      getIndustryName(item.industryCode),
+      item.incomeType,
       item.paymentYear,
       item.paymentMonth,
+      item.paymentCount,
       item.paymentAmount,
-      `${(item.taxRate * 100).toFixed(0)}%`,
+      item.necessaryExpense,
+      item.incomeAmount,
       item.incomeTax,
       item.localTax,
-      item.netPayment,
+      item.netIncome,
       item.reportFileDate ? formatDateTime(item.reportFileDate) : "-",
     ]);
 
@@ -210,33 +190,14 @@ function MonthlyContent() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `사업소득_${year}년_${month}월.csv`;
+    a.download = `기타소득_${year}년_${month}월.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // 행 클릭 → 수정 팝업 (단건/다건 통합)
-  const handleRowClick = (row: AggregatedRow) => {
-    setEditTargets(row.records);
-  };
-
-  // Add popup callbacks
-  const handleAddSaved = () => {
-    setShowAddPopup(false);
-    setToast("사업소득 추가를 완료했습니다.");
-    loadData();
-  };
-
-  const handleEditSaved = () => {
-    setEditTargets(null);
-    setToast("사업소득 수정을 완료했습니다.");
-    loadData();
-  };
-
-  const handleEditDeleted = () => {
-    setEditTargets(null);
-    setToast("사업소득 삭제를 완료했습니다.");
-    loadData();
+  // 행 클릭 → 수정 팝업
+  const handleRowClick = (item: OtherIncome) => {
+    setEditTarget(item);
   };
 
   if (!isValid) {
@@ -245,7 +206,7 @@ function MonthlyContent() {
         <p className="text-lg text-gray-600 mb-4">올바르지 않은 접근입니다.</p>
         <p className="text-sm text-gray-500 mb-6">연도와 월 파라미터가 필요합니다. (예: ?year=2026&month=1)</p>
         <button
-          onClick={() => router.push("/sps/summary")}
+          onClick={() => router.push("/oi/summary")}
           className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
           합산 화면으로 이동
@@ -259,31 +220,39 @@ function MonthlyContent() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <button
-          onClick={() => router.push("/sps/summary")}
+          onClick={() => router.push("/oi/summary")}
           className="flex items-center gap-3 text-gray-500 hover:text-gray-700"
         >
           <span>&larr;</span>
           <h1 className="text-2xl font-bold text-gray-900">
-            {year}년 {month}월 사업소득
+            {year}년 {month}월 기타소득
           </h1>
         </button>
         <button
           onClick={() => setShowAddPopup(true)}
           className="px-4 py-2 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700"
         >
-          사업소득 추가
+          기타소득 추가
         </button>
       </div>
 
       {/* 상단 요약 */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500">건수</p>
           <p className="text-lg font-bold text-gray-900">{summary.count}건</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500">총 지급액</p>
-          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalPayment)}</p>
+          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalPaymentAmount)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <p className="text-xs text-gray-500">총 필요경비</p>
+          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalNecessaryExpense)}</p>
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <p className="text-xs text-gray-500">총 소득금액</p>
+          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalIncomeAmount)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <p className="text-xs text-gray-500">총 소득세</p>
@@ -294,8 +263,8 @@ function MonthlyContent() {
           <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalLocalTax)}</p>
         </div>
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <p className="text-xs text-gray-500">총 실지급액</p>
-          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalNetPayment)}</p>
+          <p className="text-xs text-gray-500">총 실소득금액</p>
+          <p className="text-lg font-bold text-gray-900">{formatAmount(summary.totalNetIncome)}</p>
         </div>
       </div>
 
@@ -309,8 +278,7 @@ function MonthlyContent() {
             allowSpecialChar={false}
           />
           <span className="text-sm text-gray-500 whitespace-nowrap">
-            총 <span className="font-semibold text-gray-900">{filteredRows.length}</span>건
-            {" "}({filteredRows.reduce((sum, r) => sum + r.records.length, 0)}개)
+            총 <span className="font-semibold text-gray-900">{filteredData.length}</span>건
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -361,14 +329,14 @@ function MonthlyContent() {
         </div>
       </div>
 
-      {/* 안내문구 (정책 2.3) */}
+      {/* 안내문구 */}
       <p className="text-sm text-gray-500">
         ※ 간이지급명세서 신고파일 생성 후 신고파일 데이터에서 값이 수정된 대상자 또는 추가된 대상자는 상단 &apos;상세검색&apos;을 통해 검색 후 간이지급명세서 개별 생성이 가능합니다.
       </p>
 
       {/* 데이터 테이블 */}
       <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-        <table className="w-full min-w-[900px]">
+        <table className="w-full min-w-[1200px]">
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-3 py-3 w-10">
@@ -382,59 +350,55 @@ function MonthlyContent() {
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">귀속연월</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">성명(상호)</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">주민(사업자)등록번호</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">업종코드</th>
-              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">지급액</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">소득구분</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">지급건수</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">지급액(A)</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">필요경비(B)</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">소득금액(A-B)</th>
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">소득세</th>
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">지방소득세</th>
-              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">실지급액</th>
+              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500">실소득금액</th>
               <th className="px-3 py-3 text-center text-xs font-medium text-gray-500">신고파일 최종 생성일</th>
             </tr>
           </thead>
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-12 text-center text-sm text-gray-500">
+                <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-500">
                   {searchQuery ? "검색 결과가 없습니다." : "데이터가 없습니다."}
                 </td>
               </tr>
             ) : (
-              paged.map((row) => (
+              paged.map((item) => (
                 <tr
-                  key={row.groupKey}
-                  className={`border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors ${
-                    row.isAggregated ? "bg-amber-50/50" : ""
-                  }`}
-                  onClick={() => handleRowClick(row)}
+                  key={item.id}
+                  className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                  onClick={() => handleRowClick(item)}
                 >
                   <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
-                      checked={isRowSelected(row)}
-                      onChange={() => toggleSelectRow(row)}
+                      checked={selectedIds.has(item.id)}
+                      onChange={() => toggleSelectItem(item.id)}
                       className="rounded"
                     />
                   </td>
                   <td className="px-3 py-3 text-sm text-gray-900">
-                    {row.attributionYear}.{String(row.attributionMonth).padStart(2, "0")}
+                    {item.attributionYear}.{String(item.attributionMonth).padStart(2, "0")}
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">{row.name}</td>
-                  <td className="px-3 py-3 text-sm text-gray-900 font-mono">{row.idNumber}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900">{item.name}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 font-mono">{item.idNumber}</td>
                   <td className="px-3 py-3 text-sm text-gray-900">
-                    <span className="text-xs text-gray-500">{row.industryCode}</span>{" "}
-                    {getIndustryName(row.industryCode)}
+                    {getIncomeTypeName(item.incomeType)}
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-900 text-right">
-                    <span>{formatAmount(row.paymentAmount)}</span>
-                    {row.isAggregated && (
-                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800">
-                        {row.records.length}개 합산
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(row.incomeTax)}</td>
-                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(row.localTax)}</td>
-                  <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">{formatAmount(row.netPayment)}</td>
-                  <td className="px-3 py-3 text-sm text-gray-500 text-center">{formatDateTime(row.reportFileDate)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{item.paymentCount}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(item.paymentAmount)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(item.necessaryExpense)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(item.incomeAmount)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(item.incomeTax)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right">{formatAmount(item.localTax)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-900 text-right font-medium">{formatAmount(item.netIncome)}</td>
+                  <td className="px-3 py-3 text-sm text-gray-500 text-center">{formatDateTime(item.reportFileDate)}</td>
                 </tr>
               ))
             )}
@@ -445,8 +409,8 @@ function MonthlyContent() {
       {/* 페이지네이션 */}
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-500">
-          총 {filteredRows.length}건 ({allData.length}개) 중 {(currentPage - 1) * pageSize + 1}~
-          {Math.min(currentPage * pageSize, filteredRows.length)}건
+          총 {filteredData.length}건 중 {(currentPage - 1) * pageSize + 1}~
+          {Math.min(currentPage * pageSize, filteredData.length)}건
         </span>
         <Pagination
           currentPage={currentPage}
@@ -454,26 +418,6 @@ function MonthlyContent() {
           onPageChange={setCurrentPage}
         />
       </div>
-
-      {/* 팝업 */}
-      {showAddPopup && (
-        <BusinessIncomeAddPopup
-          paymentYear={year}
-          paymentMonth={month}
-          onClose={() => setShowAddPopup(false)}
-          onSaved={handleAddSaved}
-        />
-      )}
-
-      {editTargets && (
-        <BusinessIncomeEditPopup
-          records={editTargets}
-          onClose={() => setEditTargets(null)}
-          onSaved={handleEditSaved}
-          onDeleted={handleEditDeleted}
-          onRefresh={loadData}
-        />
-      )}
 
       {/* Toast */}
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
@@ -486,11 +430,42 @@ function MonthlyContent() {
           onCancel={() => setConfirmDialog(null)}
         />
       )}
+
+      {/* Add Popup */}
+      {showAddPopup && (
+        <OtherIncomeAddPopup
+          paymentYear={year}
+          paymentMonth={month}
+          onClose={() => setShowAddPopup(false)}
+          onSaved={() => {
+            setShowAddPopup(false);
+            setToast("기타소득이 추가되었습니다.");
+            loadData();
+          }}
+        />
+      )}
+
+      {/* Edit Popup */}
+      {editTarget && (
+        <OtherIncomeEditPopup
+          record={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={() => {
+            setEditTarget(null);
+            setToast("기타소득이 수정되었습니다.");
+            loadData();
+          }}
+          onDeleted={() => {
+            setEditTarget(null);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-export default function SPSMonthlyPage() {
+export default function OIMonthlyPage() {
   return (
     <Suspense
       fallback={

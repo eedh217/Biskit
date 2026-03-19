@@ -33,14 +33,29 @@ function getMenuItems(depth1: string): MenuItem2depth[] {
             { label: "전체 사업소득", href: "/policy/sps/all" },
           ],
         },
+        {
+          label: "기타소득",
+          children: [
+            { label: "월별 기타소득", href: "/policy/oi/monthly" },
+            { label: "전체 기타소득", href: "/policy/oi/all" },
+          ],
+        },
       ];
     case "sps":
+    case "oi":
       return [
         {
           label: "사업소득",
           children: [
             { label: "월별 사업소득", href: "/sps/summary" },
             { label: "전체 사업소득", href: "/sps/all" },
+          ],
+        },
+        {
+          label: "기타소득",
+          children: [
+            { label: "월별 기타소득", href: "/oi/summary" },
+            { label: "전체 기타소득", href: "/oi/all" },
           ],
         },
       ];
@@ -52,6 +67,7 @@ function getMenuItems(depth1: string): MenuItem2depth[] {
 function getDepth1FromPathname(pathname: string): string | null {
   if (pathname.startsWith("/policy")) return "policy";
   if (pathname.startsWith("/sps")) return "sps";
+  if (pathname.startsWith("/oi")) return "oi";
   return null;
 }
 
@@ -61,6 +77,7 @@ export default function LNB({ isOpen = true }: { isOpen?: boolean }) {
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
     "공통 정책": true,
     사업소득: true,
+    기타소득: true,
   });
 
   if (!depth1) return null;

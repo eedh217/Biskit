@@ -292,9 +292,10 @@ export function getYearlySummary(year: number): MonthlySummary[] {
 
   for (let month = 1; month <= 12; month++) {
     const items = getBusinessIncomesForSummaryMonth(year, month);
+    const aggregated = aggregateForMonthlyList(items);
     summaries.push({
       month,
-      count: items.length,
+      count: aggregated.length, // 합산 후 row 개수
       totalPayment: items.reduce((sum, i) => sum + i.paymentAmount, 0),
       totalIncomeTax: items.reduce((sum, i) => sum + i.incomeTax, 0),
       totalLocalTax: items.reduce((sum, i) => sum + i.localTax, 0),
@@ -342,15 +343,18 @@ export function getDecemberExceptionBreakdown(year: number): {
     (item) => item.attributionYear === year && item.paymentYear > year
   );
 
-  const aggregate = (items: BusinessIncome[]): MonthlySummary => ({
-    month: 12,
-    count: items.length,
-    totalPayment: items.reduce((sum, i) => sum + i.paymentAmount, 0),
-    totalIncomeTax: items.reduce((sum, i) => sum + i.incomeTax, 0),
-    totalLocalTax: items.reduce((sum, i) => sum + i.localTax, 0),
-    totalNetPayment: items.reduce((sum, i) => sum + i.netPayment, 0),
-    reportFileDate: null,
-  });
+  const aggregate = (items: BusinessIncome[]): MonthlySummary => {
+    const aggregated = aggregateForMonthlyList(items);
+    return {
+      month: 12,
+      count: aggregated.length, // 합산 후 row 개수
+      totalPayment: items.reduce((sum, i) => sum + i.paymentAmount, 0),
+      totalIncomeTax: items.reduce((sum, i) => sum + i.incomeTax, 0),
+      totalLocalTax: items.reduce((sum, i) => sum + i.localTax, 0),
+      totalNetPayment: items.reduce((sum, i) => sum + i.netPayment, 0),
+      reportFileDate: null,
+    };
+  };
 
   return {
     sameYearPayment: aggregate(sameYear),
@@ -411,6 +415,7 @@ export function aggregateForMonthlyList(items: BusinessIncome[]): AggregatedRow[
         incomeTax: item.incomeTax,
         localTax: item.localTax,
         netPayment: item.netPayment,
+        reportFileDate: item.reportFileDate,
       });
     }
   }
@@ -436,6 +441,7 @@ export function aggregateForMonthlyList(items: BusinessIncome[]): AggregatedRow[
         incomeTax: item.incomeTax,
         localTax: item.localTax,
         netPayment: item.netPayment,
+        reportFileDate: item.reportFileDate,
       });
     }
   }
@@ -457,6 +463,7 @@ export function aggregateForMonthlyList(items: BusinessIncome[]): AggregatedRow[
       incomeTax: records.reduce((sum, r) => sum + r.incomeTax, 0),
       localTax: records.reduce((sum, r) => sum + r.localTax, 0),
       netPayment: records.reduce((sum, r) => sum + r.netPayment, 0),
+      reportFileDate: first.reportFileDate,
     });
   }
 

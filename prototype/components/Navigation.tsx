@@ -3,9 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const tabs = [
+const tabs: Array<
+  | { label: string; href: string; prefix: string }
+  | { label: string; href: string; prefixes: string[] }
+> = [
   { label: "정책분석", href: "/policy/sps/monthly", prefix: "/policy" },
-  { label: "화면", href: "/sps/summary", prefix: "/sps" },
+  { label: "화면", href: "/sps/summary", prefixes: ["/sps", "/oi"] },
 ];
 
 export default function Navigation() {
@@ -20,7 +23,9 @@ export default function Navigation() {
           </Link>
 
           {tabs.map((tab) => {
-            const isActive = pathname.startsWith(tab.prefix);
+            const isActive = "prefix" in tab
+              ? pathname.startsWith(tab.prefix)
+              : tab.prefixes?.some((prefix) => pathname.startsWith(prefix)) || false;
             return (
               <Link
                 key={tab.label}

@@ -32,19 +32,19 @@ function parseMarkdown(content: string): {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // --- 구분선은 무시
-    if (line.trim() === "---") {
+    // --- 구분선은 무시 (마크다운 또는 이스케이프된 형태)
+    if (line.trim() === "---" || line.trim() === "* * *") {
       continue;
     }
 
-    // ## 1. 화면 개요 또는 기능 개요 시작
-    if (line.match(/^##\s*1\.\s*(화면|기능)\s*개요/)) {
+    // ## 1. 화면 개요 또는 기능 개요 시작 (이스케이프된 \. 도 허용)
+    if (line.match(/^##\s*1\\?\.\s*(화면|기능)\s*개요/)) {
       inOverview = true;
       continue;
     }
 
-    // ## 2. ~ 다른 섹션 시작
-    const otherSectionMatch = line.match(/^##\s*(\d+)\.\s*(.+)/);
+    // ## 2. ~ 다른 섹션 시작 (이스케이프된 \. 도 허용)
+    const otherSectionMatch = line.match(/^##\s*(\d+)\\?\.\s*(.+)/);
     if (otherSectionMatch && otherSectionMatch[1] !== "1") {
       // 이전 섹션 저장
       if (currentSection) {

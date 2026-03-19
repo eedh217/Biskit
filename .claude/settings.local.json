@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(netstat:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell.exe -Command \"Get-Process | Where-Object {$_ProcessName -like ''*Code*'' -or $_ProcessName -like ''*node*''} | Select-Object ProcessName, Id | Format-Table\")",
+      "Bash(claude --version:*)",
+      "Bash(claude config list:*)",
+      "Bash(claude code --help:*)",
+      "Bash(code --status:*)",
+      "Bash(powershell \"Get-Process Code | Stop-Process -Force\")",
+      "Bash(powershell:*)",
+      "Bash(wmic process where \"name=''Code.exe''\" get commandline)",
+      "Bash(where:*)",
+      "Bash(dir:*)",
+      "Bash(done)",
+      "Bash(claude code:*)",
+      "Bash(code --version:*)",
+      "Bash(echo:*)"
     ]
   }
 }

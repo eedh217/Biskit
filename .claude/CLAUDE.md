@@ -5,7 +5,9 @@
 - **기술 스택**: Next.js 14 (App Router), React 18, TypeScript (strict mode), Tailwind CSS
 - **데이터 저장**: localStorage (백엔드 없음)
 - **작업 디렉토리**: `prototype/`
-- **주요 모듈**: 사업소득(SPS) 관리 시스템
+- **주요 모듈**:
+  - 사업소득(SPS/BI) 관리 시스템
+  - 기타소득(SPS/OI) 관리 시스템
 
 ## 파일 구조 관리
 - **STRUCTURE.md 자동 업데이트 규칙**
@@ -32,6 +34,7 @@
 - 파일명: kebab-case for routes, PascalCase for components
 
 ## 핵심 데이터 모델
+
 ### BusinessIncome 인터페이스 (`types/sps.ts`)
 ```typescript
 {
@@ -50,6 +53,30 @@
   localTax: number         // 지방세
   netPayment: number       // 실지급액
   reportFileDate: string | null
+  createdAt: string
+}
+```
+
+### OtherIncome 인터페이스 (`types/sps.ts`)
+```typescript
+{
+  id: string
+  name: string                    // 성명(상호)
+  isForeign: "N" | "Y"           // 외국인 여부 (정보 표시용)
+  idNumber: string               // 주민(사업자)등록번호 (10 or 13자리, 체크디지트 검증 없음)
+  incomeType: "자문/고문" | "자문/고문 외 인적용역"  // 소득구분
+  attributionYear: number        // 귀속연도
+  attributionMonth: number       // 귀속월
+  paymentYear: number            // 지급연도
+  paymentMonth: number           // 지급월
+  paymentCount: number           // 지급건수 (사용자 입력)
+  paymentAmount: number          // 지급액(A)
+  necessaryExpense: number       // 필요경비(B)
+  incomeAmount: number           // 소득금액(A-B)
+  incomeTax: number              // 소득세
+  localTax: number               // 지방소득세
+  netIncome: number              // 실소득금액 = 소득금액 - 소득세 - 지방소득세
+  reportFileDate: string | null  // 신고파일 최종생성일
   createdAt: string
 }
 ```
@@ -97,32 +124,49 @@
   - `851101`: 병의원 (사업자번호 필수)
 
 ### 5. 합산 건수 정의
-- **합산 건수(개수)**: 동일한 (귀속연도, 귀속월, 주민번호, 업종코드)를 가진 레코드들을 그룹화한 개수
+- **사업소득 합산 건수(개수)**: 동일한 (귀속연도, 귀속월, 주민번호, 업종코드)를 가진 레코드들을 그룹화한 개수
 - 월별 리스트에서는 개별 건수를 표시하지만, 합산 화면에서는 그룹화된 개수를 표시
 - **예시**: 같은 사람이 같은 월에 같은 업종으로 3건이 있으면 → 합산 화면에서 1건으로 카운트
+- **기타소득 건수**: row 1개당 1건으로 정의 (그룹화 없음)
 
 ## 핵심 파일 및 역할
 
 ### lib/ (비즈니스 로직)
-- **store.ts**: localStorage CRUD + 예외 업종 로직 (20개 시드 데이터 포함)
-- **taxCalculation.ts**: 세율 결정 + 세금 계산
-- **spsValidation.ts**: 입력 검증 + 체크디지트 알고리즘
-- **industryCodes.ts**: 40개 업종코드 + 예외코드 상수
+- **store.ts**: localStorage CRUD + 예외 업종 로직 (사업소득 20개 시드 데이터 포함)
+- **oiStore.ts**: 기타소득 localStorage CRUD (시드 데이터 포함)
+- **taxCalculation.ts**: 세율 결정 + 세금 계산 (사업소득용)
+- **oiTaxCalculation.ts**: 기타소득 세금 계산 (세율 20% 고정, 필요경비 60% 규칙)
+- **spsValidation.ts**: 사업소득 입력 검증 + 체크디지트 알고리즘
+- **oiValidation.ts**: 기타소득 입력 검증 (체크디지트 제외)
+- **industryCodes.ts**: 40개 업종코드 + 예외코드 상수 (사업소득용)
+- **incomeTypes.ts**: 2개 소득구분 코드 (기타소득용: 자문/고문, 자문/고문 외 인적용역)
 - **formatUtils.ts**: 금액/날짜 포맷팅 유틸
 - **excelUpload.ts**: 엑셀 파일 파싱 + 18가지 검증 로직
 - **excelTemplate.ts**: 엑셀 템플릿 생성 + 실패 데이터 다운로드
 
 ### app/ (페이지)
+#### 사업소득 (BI)
 - **sps/summary/page.tsx**: SPS_BI_01 - 연도별 월별 합산 화면
 - **sps/monthly/page.tsx**: SPS_BI_02 - 월별 상세 리스트 (Suspense 필수)
 - **sps/all/page.tsx**: SPS_BI_05 - 전체 리스트 (검색, 페이징, 일괄 삭제)
 
-### components/sps/ (SPS 전용 팝업)
+#### 기타소득 (OI)
+- **oi/summary/page.tsx**: SPS_OI_01 - 연도별 월별 합산 화면
+- **oi/monthly/page.tsx**: SPS_OI_02 - 월별 상세 리스트 (Suspense 필수)
+- **oi/all/page.tsx**: SPS_OI_05 - 전체 리스트 (검색, 페이징, 일괄 삭제)
+
+### components/sps/ (사업소득 팝업)
 - **BusinessIncomeAddPopup.tsx**: SPS_BI_03 - 월별 추가 팝업
 - **BusinessIncomeEditPopup.tsx**: SPS_BI_04 - 월별 수정 팝업
 - **AllBusinessIncomeAddPopup.tsx**: 전체 추가 팝업
 - **AllBusinessIncomeEditPopup.tsx**: 전체 수정 팝업
 - **ExcelUploadResultPopup.tsx**: 엑셀 업로드 결과 팝업
+
+### components/oi/ (기타소득 팝업)
+- **OtherIncomeAddPopup.tsx**: SPS_OI_03 - 월별 추가 팝업
+- **OtherIncomeEditPopup.tsx**: SPS_OI_04 - 월별 수정 팝업
+- **AllOtherIncomeAddPopup.tsx**: SPS_OI_06 - 전체 추가 팝업 (지급연월 선택 가능)
+- **AllOtherIncomeEditPopup.tsx**: SPS_OI_07 - 전체 수정 팝업 (지급연월 수정 가능)
 
 ### components/manage/ (재사용 공통 컴포넌트)
 - **SearchBar.tsx**: 검색 입력 (한글/영문/특수문자 검증)
@@ -224,16 +268,51 @@ npm run dev     # 개발 서버
 5. **중복 검증 키**: (지급연도, 지급월, 귀속연도, 귀속월, 주민번호, 업종코드)
 6. **합산 건수 정의**: (귀속연도, 귀속월, 주민번호, 업종코드) 그룹화 기준
 
+## 기타소득(OI) 모듈 특징
+
+### 사업소득과의 주요 차이점
+1. **예외 업종 규칙 없음**: 12월 예외 처리 불필요 (단순 1~12월 합산)
+2. **필요경비 필드**: 지급액(A), 필요경비(B), 소득금액(A-B) 구조
+3. **실소득금액**: 소득금액 - 소득세 - 지방소득세
+4. **소득구분 2개**: 자문/고문, 자문/고문 외 인적용역
+5. **세율 20% 고정**: 모든 기타소득에 동일 세율 적용
+6. **체크디지트 검증 제외**: 주민번호/사업자번호 자릿수만 검증
+7. **필요경비 60% 규칙**: 필요경비 ≥ 지급액 × 0.6 (60% 이상)
+8. **지급건수**: 사용자가 직접 입력
+9. **수정 팝업**: 지급액 0원 입력 허용 (추가 팝업은 불가)
+
+### 기타소득 비즈니스 로직
+- **세금 계산**:
+  - 소득금액 = 지급액 - 필요경비
+  - 소득세 = Math.floor(소득금액 × 0.2)
+  - 소액부징수: 소득세 < 1,000원 → 소득세 = 0원
+  - 지방소득세 = Math.floor(소득세 × 0.1)
+  - 실소득금액 = 소득금액 - 소득세 - 지방소득세
+- **중복 검증 키**: (지급연월, 귀속연월, 주민번호, 소득구분)
+- **필요경비 검증**: 지급액 × 0.6 ≤ 필요경비 ≤ 지급액
+
+### 기타소득 화면별 특징
+- **SPS_OI_05 (전체 기타소득)**:
+  - 최근 등록순 정렬
+  - 합산 건수 없음 (개별 건으로 표시)
+  - 데이터 연동: SPS_OI_01, SPS_OI_02와 양방향 연동
+- **SPS_OI_06 (전체 기타소득 추가 팝업)**:
+  - SPS_OI_03과 동일 + 지급연월 선택 가능
+- **SPS_OI_07 (전체 기타소득 수정 팝업)**:
+  - SPS_OI_04와 동일 + 지급연월 수정 가능
+  - 지급액 0원 수정 가능
+
 ### 새 기능 추가 시 체크리스트
 - [ ] `types/sps.ts`에 필요한 타입 추가/수정
-- [ ] `lib/store.ts`에 CRUD 함수 추가/수정
+- [ ] `lib/store.ts` 또는 `lib/oiStore.ts`에 CRUD 함수 추가/수정
 - [ ] `STRUCTURE.md` 업데이트
 - [ ] 기존 비즈니스 로직과 충돌 없는지 확인
 - [ ] 엑셀 업로드/다운로드 영향 확인
 - [ ] Toast/ConfirmDialog 등 공통 컴포넌트 재사용
 
 ### 디버깅 팁
-- localStorage 데이터 확인: `localStorage.getItem('businessIncomes')`
+- 사업소득 localStorage 확인: `localStorage.getItem('businessIncomes')`
+- 기타소득 localStorage 확인: `localStorage.getItem('otherIncomes')`
 - 시드 데이터 리셋: localStorage 초기화 후 페이지 새로고침
 - Next.js 빌드 에러: `prototype/.next` 폴더 삭제 후 재빌드
 - useSearchParams 에러: Suspense 래핑 확인
