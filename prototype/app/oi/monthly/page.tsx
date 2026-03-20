@@ -347,7 +347,8 @@ function MonthlyContent() {
                   className="rounded"
                 />
               </th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">귀속연월</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">귀속연도</th>
+              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">귀속월</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">성명(상호)</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">주민(사업자)등록번호</th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500">소득구분</th>
@@ -364,7 +365,7 @@ function MonthlyContent() {
           <tbody>
             {paged.length === 0 ? (
               <tr>
-                <td colSpan={13} className="px-4 py-12 text-center text-sm text-gray-500">
+                <td colSpan={14} className="px-4 py-12 text-center text-sm text-gray-500">
                   {searchQuery ? "검색 결과가 없습니다." : "데이터가 없습니다."}
                 </td>
               </tr>
@@ -383,9 +384,8 @@ function MonthlyContent() {
                       className="rounded"
                     />
                   </td>
-                  <td className="px-3 py-3 text-sm text-gray-900">
-                    {item.attributionYear}.{String(item.attributionMonth).padStart(2, "0")}
-                  </td>
+                  <td className="px-3 py-3 text-sm text-gray-900">{item.attributionYear}년</td>
+                  <td className="px-3 py-3 text-sm text-gray-900">{String(item.attributionMonth).padStart(2, "0")}월</td>
                   <td className="px-3 py-3 text-sm text-gray-900">{item.name}</td>
                   <td className="px-3 py-3 text-sm text-gray-900 font-mono">{item.idNumber}</td>
                   <td className="px-3 py-3 text-sm text-gray-900">
