@@ -19,7 +19,9 @@ interface Props {
 
 const NAME_ALLOWED_PATTERN = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s&'\-\.·()]*$/;
 
-export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDeleted }: Props) {
+export default function AllOtherIncomeEditPopup({ record, onClose, onSaved, onDeleted }: Props) {
+  const [paymentYear, setPaymentYear] = useState<string>(String(record.paymentYear));
+  const [paymentMonth, setPaymentMonth] = useState<string>(String(record.paymentMonth));
   const [attrYear, setAttrYear] = useState<string>(String(record.attributionYear));
   const [attrMonth, setAttrMonth] = useState<string>(String(record.attributionMonth));
   const [name, setName] = useState(record.name);
@@ -41,6 +43,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   const [showIncomeTypeTooltip, setShowIncomeTypeTooltip] = useState(false);
 
   const initialRef = useRef({
+    paymentYear: String(record.paymentYear),
+    paymentMonth: String(record.paymentMonth),
     attrYear: String(record.attributionYear),
     attrMonth: String(record.attributionMonth),
     name: record.name,
@@ -55,6 +59,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   const isDirty = useCallback(() => {
     const init = initialRef.current;
     return (
+      paymentYear !== init.paymentYear ||
+      paymentMonth !== init.paymentMonth ||
       attrYear !== init.attrYear ||
       attrMonth !== init.attrMonth ||
       name !== init.name ||
@@ -65,7 +71,7 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       paymentAmountRaw !== init.paymentAmountRaw ||
       necessaryExpenseRaw !== init.necessaryExpenseRaw
     );
-  }, [attrYear, attrMonth, name, isForeign, idNumber, incomeType, paymentCountRaw, paymentAmountRaw, necessaryExpenseRaw]);
+  }, [paymentYear, paymentMonth, attrYear, attrMonth, name, isForeign, idNumber, incomeType, paymentCountRaw, paymentAmountRaw, necessaryExpenseRaw]);
 
   const handleClose = () => {
     if (isDirty()) {
@@ -121,7 +127,25 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
     setTaxResult(result);
   }, [paymentAmountRaw, necessaryExpenseRaw]);
 
-  // Blur handlers (similar to Add popup)
+  // Blur handlers
+  const handlePaymentYearBlur = () => {
+    if (!paymentYear) {
+      setError("paymentYear", "필수 입력 항목입니다.");
+    } else {
+      setError("paymentYear", null);
+    }
+    validateAttrDateFields();
+  };
+
+  const handlePaymentMonthBlur = () => {
+    if (!paymentMonth) {
+      setError("paymentMonth", "필수 입력 항목입니다.");
+    } else {
+      setError("paymentMonth", null);
+    }
+    validateAttrDateFields();
+  };
+
   const handleAttrYearBlur = () => {
     if (!attrYear) {
       setError("attrYear", "필수 입력 항목입니다.");
@@ -141,8 +165,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   };
 
   const validateAttrDateFields = () => {
-    if (attrYear && attrMonth) {
-      const err = validateAttrDate(Number(attrYear), Number(attrMonth), record.paymentYear, record.paymentMonth);
+    if (attrYear && attrMonth && paymentYear && paymentMonth) {
+      const err = validateAttrDate(Number(attrYear), Number(attrMonth), Number(paymentYear), Number(paymentMonth));
       setError("attrDate", err);
     } else {
       setError("attrDate", null);
@@ -203,14 +227,21 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
   const handleNecessaryExpenseBlur = () => {
     if (!necessaryExpenseRaw) {
       setError("necessaryExpense", "필수 입력 항목입니다.");
+      return;
     } else {
       setError("necessaryExpense", null);
     }
-    validateNecessaryExpenseRule();
-    setTimeout(recalculate, 0);
+
+    // 필요경비 유효성 검증 수행
+    const hasError = validateNecessaryExpenseRule();
+
+    // 검증 통과 시에만 자동 계산 수행
+    if (!hasError) {
+      setTimeout(recalculate, 0);
+    }
   };
 
-  const validateNecessaryExpenseRule = () => {
+  const validateNecessaryExpenseRule = (): boolean => {
     if (paymentAmountRaw && necessaryExpenseRaw) {
       const paymentAmount = parseInt(paymentAmountRaw, 10);
       const necessaryExpense = parseInt(necessaryExpenseRaw, 10);
@@ -220,13 +251,17 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
 
         if (necessaryExpense < minExpense) {
           setError("necessaryExpense", `필요경비는 지급액의 60% 이상이어야 합니다. (최소: ${formatAmount(minExpense)})`);
+          return true; // 에러 있음
         } else if (necessaryExpense > paymentAmount) {
           setError("necessaryExpense", "필요경비는 지급액을 초과할 수 없습니다.");
+          return true; // 에러 있음
         } else {
           setError("necessaryExpense", null);
+          return false; // 에러 없음
         }
       }
     }
+    return false; // 에러 없음
   };
 
   const handleNameChange = (v: string) => {
@@ -276,6 +311,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
     // Validate all fields
     const newErrors: Record<string, string> = {};
 
+    if (!paymentYear) newErrors.paymentYear = "필수 입력 항목입니다.";
+    if (!paymentMonth) newErrors.paymentMonth = "필수 입력 항목입니다.";
     if (!attrYear) newErrors.attrYear = "필수 입력 항목입니다.";
     if (!attrMonth) newErrors.attrMonth = "필수 입력 항목입니다.";
     if (!name.trim()) newErrors.name = "필수 입력 항목입니다.";
@@ -301,8 +338,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       if (lenErr) newErrors.idNumber = lenErr;
     }
 
-    if (attrYear && attrMonth) {
-      const dateErr = validateAttrDate(Number(attrYear), Number(attrMonth), record.paymentYear, record.paymentMonth);
+    if (attrYear && attrMonth && paymentYear && paymentMonth) {
+      const dateErr = validateAttrDate(Number(attrYear), Number(attrMonth), Number(paymentYear), Number(paymentMonth));
       if (dateErr) newErrors.attrDate = dateErr;
     }
 
@@ -342,8 +379,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
     const dup = all.some(
       (item) =>
         item.id !== record.id &&
-        item.paymentYear === record.paymentYear &&
-        item.paymentMonth === record.paymentMonth &&
+        item.paymentYear === Number(paymentYear) &&
+        item.paymentMonth === Number(paymentMonth) &&
         item.attributionYear === Number(attrYear) &&
         item.attributionMonth === Number(attrMonth) &&
         item.idNumber === idNumber &&
@@ -376,6 +413,8 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       incomeType,
       attributionYear: Number(attrYear),
       attributionMonth: Number(attrMonth),
+      paymentYear: Number(paymentYear),
+      paymentMonth: Number(paymentMonth),
       paymentCount,
       paymentAmount,
       necessaryExpense,
@@ -408,6 +447,39 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
           </div>
 
           <div className="px-6 py-4 space-y-4">
+            {/* 지급연도/월 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                지급연도 / 지급월 <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={paymentYear}
+                  onChange={(e) => { setPaymentYear(e.target.value); setError("paymentYear", null); }}
+                  onBlur={handlePaymentYearBlur}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">선택</option>
+                  {yearOptions.map((y) => (
+                    <option key={y} value={y}>{y}년</option>
+                  ))}
+                </select>
+                <select
+                  value={paymentMonth}
+                  onChange={(e) => { setPaymentMonth(e.target.value); setError("paymentMonth", null); }}
+                  onBlur={handlePaymentMonthBlur}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">선택</option>
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                    <option key={m} value={m}>{m}월</option>
+                  ))}
+                </select>
+              </div>
+              {errors.paymentYear && <p className="text-xs text-red-500 mt-1">{errors.paymentYear}</p>}
+              {errors.paymentMonth && <p className="text-xs text-red-500 mt-1">{errors.paymentMonth}</p>}
+            </div>
+
             {/* 귀속연도/월 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

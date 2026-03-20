@@ -38,6 +38,7 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
   } | null>(null);
 
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [showIncomeTypeTooltip, setShowIncomeTypeTooltip] = useState(false);
 
   const initialRef = useRef({
     paymentYear: "", paymentMonth: "", attrYear: "", attrMonth: "", name: "", isForeign: "N" as const,
@@ -568,7 +569,38 @@ export default function AllOtherIncomeAddPopup({ onClose, onSaved }: Props) {
                       onBlur={handleIncomeTypeBlur}
                       className="text-blue-600"
                     />
-                    {it.name}
+                    <span>{it.name}</span>
+                    {it.code === "자문/고문 외 인적용역" && (
+                      <div className="relative inline-block">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setShowIncomeTypeTooltip(!showIncomeTypeTooltip);
+                          }}
+                          className="ml-1 text-blue-500 hover:text-blue-700 text-base leading-none"
+                          title="도움말"
+                        >
+                          ℹ️
+                        </button>
+                        {showIncomeTypeTooltip && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setShowIncomeTypeTooltip(false)}
+                            />
+                            <div className="absolute left-0 top-6 z-50 w-80 bg-white border border-gray-300 rounded-lg shadow-lg p-4 text-xs text-gray-700 leading-relaxed">
+                              <ul className="list-disc list-inside space-y-1">
+                                <li>고용관계 없이 다수인에게 강연을 하고 강연료 등 대가를 받는 용역</li>
+                                <li>라디오/텔리비전방송 등을 통하여 해설/계몽 또는 연기의 심사 등을 하고 보수 또는 이와 유사한 성질의 대가를 받는 용역</li>
+                                <li>변호사/공인회계사/세무사 그 밖에 전문적 지식 또는 특별한 기능을 가진 자가 그 지식 또는 기능을 활용하여 보수 또는 그 밖의 대가를 받고 제공하는 용역</li>
+                                <li>그 밖에 고용관계 없이 수당 또는 이와 유사한 성질의 대가를 받고 제공하는 용역</li>
+                              </ul>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </label>
                 ))}
               </div>

@@ -11,7 +11,7 @@ import PageSizeSelect from "@/components/manage/PageSizeSelect";
 import Toast from "@/components/manage/Toast";
 import ConfirmDialog from "@/components/manage/ConfirmDialog";
 import AllOtherIncomeAddPopup from "@/components/oi/AllOtherIncomeAddPopup";
-import OtherIncomeEditPopup from "@/components/oi/OtherIncomeEditPopup";
+import AllOtherIncomeEditPopup from "@/components/oi/AllOtherIncomeEditPopup";
 
 export default function OIAllPage() {
   const [allData, setAllData] = useState<OtherIncome[]>([]);
@@ -326,7 +326,7 @@ export default function OIAllPage() {
 
       {/* Edit Popup */}
       {editTarget && (
-        <OtherIncomeEditPopup
+        <AllOtherIncomeEditPopup
           record={editTarget}
           onClose={() => setEditTarget(null)}
           onSaved={() => {
