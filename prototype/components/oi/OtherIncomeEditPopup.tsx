@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { OtherIncome, IncomeTypeCode } from "@/types/sps";
 import { INCOME_TYPES, isValidIncomeType } from "@/lib/incomeTypes";
 import { calculateOITax } from "@/lib/oiTaxCalculation";
@@ -73,6 +73,31 @@ export default function OtherIncomeEditPopup({ record, onClose, onSaved, onDelet
       onClose();
     }
   };
+
+  // ESC 키 및 브라우저 뒤로가기 이벤트 처리
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+
+    const handlePopState = () => {
+      handleClose();
+    };
+
+    // 히스토리 스택에 상태 추가
+    window.history.pushState(null, '', window.location.href);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const setError = (field: string, message: string | null) => {
     setErrors((prev) => {

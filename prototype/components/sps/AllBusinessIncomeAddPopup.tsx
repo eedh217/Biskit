@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { INDUSTRY_CODES, isExceptionIndustry, GRATUITY_CODE } from "@/lib/industryCodes";
 import { determineTaxRate, calculateTax, needsTaxRateSelection } from "@/lib/taxCalculation";
 import {
@@ -70,6 +70,31 @@ export default function AllBusinessIncomeAddPopup({ onClose, onSaved }: Props) {
       onClose();
     }
   };
+
+  // ESC 키 및 브라우저 뒤로가기 이벤트 처리
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+
+    const handlePopState = () => {
+      handleClose();
+    };
+
+    // 히스토리 스택에 상태 추가
+    window.history.pushState(null, '', window.location.href);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const setError = (field: string, message: string | null) => {
     setErrors((prev) => {

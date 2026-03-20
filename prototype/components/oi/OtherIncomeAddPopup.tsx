@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { IncomeTypeCode } from "@/types/sps";
 import { INCOME_TYPES, isValidIncomeType } from "@/lib/incomeTypes";
 import { calculateOITax } from "@/lib/oiTaxCalculation";
@@ -66,6 +66,31 @@ export default function OtherIncomeAddPopup({ paymentYear, paymentMonth, onClose
       onClose();
     }
   };
+
+  // ESC 키 및 브라우저 뒤로가기 이벤트 처리
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleClose();
+      }
+    };
+
+    const handlePopState = () => {
+      handleClose();
+    };
+
+    // 히스토리 스택에 상태 추가
+    window.history.pushState(null, '', window.location.href);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const setError = (field: string, message: string | null) => {
     setErrors((prev) => {
@@ -172,14 +197,21 @@ export default function OtherIncomeAddPopup({ paymentYear, paymentMonth, onClose
   const handleNecessaryExpenseBlur = () => {
     if (!necessaryExpenseRaw) {
       setError("necessaryExpense", "필수 입력 항목입니다.");
+      return;
     } else {
       setError("necessaryExpense", null);
     }
-    validateNecessaryExpenseRule();
-    setTimeout(recalculate, 0);
+
+    // 필요경비 유효성 검증 수행
+    const hasError = validateNecessaryExpenseRule();
+
+    // 검증 통과 시에만 자동 계산 수행
+    if (!hasError) {
+      setTimeout(recalculate, 0);
+    }
   };
 
-  const validateNecessaryExpenseRule = () => {
+  const validateNecessaryExpenseRule = (): boolean => {
     if (paymentAmountRaw && necessaryExpenseRaw) {
       const paymentAmount = parseInt(paymentAmountRaw, 10);
       const necessaryExpense = parseInt(necessaryExpenseRaw, 10);
@@ -189,13 +221,17 @@ export default function OtherIncomeAddPopup({ paymentYear, paymentMonth, onClose
 
         if (necessaryExpense < minExpense) {
           setError("necessaryExpense", `필요경비는 지급액의 60% 이상이어야 합니다. (최소: ${formatAmount(minExpense)})`);
+          return true; // 에러 있음
         } else if (necessaryExpense > paymentAmount) {
           setError("necessaryExpense", "필요경비는 지급액을 초과할 수 없습니다.");
+          return true; // 에러 있음
         } else {
           setError("necessaryExpense", null);
+          return false; // 에러 없음
         }
       }
     }
+    return false; // 에러 없음
   };
 
   const handleNameChange = (v: string) => {
